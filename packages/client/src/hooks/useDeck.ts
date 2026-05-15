@@ -10,6 +10,8 @@ function nanoid() {
 interface DeckState {
   deck: Deck | null;
   currentSlideIndex: number;
+  deckHtml: string | null;   // AI 生成的完整 HTML
+  isAiDeck: boolean;         // 标记当前 deck 是否由 AI 生成
 
   initDeck: (title: string, slides: Slide[], theme: string) => void;
   setGlobalTheme: (theme: string) => void;
@@ -24,6 +26,8 @@ interface DeckState {
   updateSlideFx: (slideId: string, fx: string | null) => void;
   updateSlotValue: (slideId: string, slotId: string, value: string) => void;
   updateSlideNotes: (slideId: string, notes: string) => void;
+  setDeckHtml: (html: string) => void;
+  clearDeckHtml: () => void;
 }
 
 function createSlide(layout: LayoutType, theme: string, order: number): Slide {
@@ -48,6 +52,11 @@ function createSlide(layout: LayoutType, theme: string, order: number): Slide {
 export const useDeck = create<DeckState>((set, get) => ({
   deck: null,
   currentSlideIndex: 0,
+  deckHtml: null,
+  isAiDeck: false,
+
+  setDeckHtml: (html) => set({ deckHtml: html, isAiDeck: true }),
+  clearDeckHtml: () => set({ deckHtml: null, isAiDeck: false }),
 
   initDeck: (title, slides, theme) => set({
     deck: {
@@ -59,6 +68,8 @@ export const useDeck = create<DeckState>((set, get) => ({
       updatedAt: Date.now(),
     },
     currentSlideIndex: 0,
+    deckHtml: null,
+    isAiDeck: false,
   }),
 
   setGlobalTheme: (theme) => set(state => {
