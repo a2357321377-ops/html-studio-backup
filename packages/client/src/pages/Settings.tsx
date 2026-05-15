@@ -14,6 +14,8 @@ export default function Settings() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
+  const [saving, setSaving] = useState(false);
+
   const handleTest = async () => {
     setTesting(true);
     setTestResult(null);
@@ -26,8 +28,16 @@ export default function Settings() {
     setTesting(false);
   };
 
-  const handleSave = () => {
-    setTestResult({ ok: true, msg: '配置已保存到浏览器本地' });
+  const handleSave = async () => {
+    setSaving(true);
+    setTestResult(null);
+    try {
+      await testConnection();
+      setTestResult({ ok: true, msg: '配置已保存，AI 连接成功' });
+    } catch (err: any) {
+      setTestResult({ ok: false, msg: `配置已保存，但连接失败：${err?.message ?? '未知错误'}` });
+    }
+    setSaving(false);
   };
 
   return (
@@ -115,10 +125,11 @@ export default function Settings() {
               {testing ? '测试中...' : '测试连接'}
             </button>
             <button
-              className="px-4 py-2 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)] text-xs text-[var(--color-text-dim)] hover:text-[var(--color-text)]"
+              className="px-4 py-2 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)] text-xs text-[var(--color-text-dim)] hover:text-[var(--color-text)] disabled:opacity-40"
               onClick={handleSave}
+              disabled={saving || !apiKey}
             >
-              保存配置
+              {saving ? '保存并测试中...' : '保存配置'}
             </button>
           </div>
 
