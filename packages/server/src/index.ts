@@ -66,6 +66,74 @@ app.post('/api/ai/chat', async (c) => {
   }
 });
 
+// AI 流式代理路由 — SSE 格式
+app.post('/api/ai/chat/stream', async (c) => {
+  const body = await c.req.json<{
+    provider: 'openai' | 'anthropic';
+    baseUrl: string;
+    apiKey: string;
+    model: string;
+    messages: { role: string; content: string }[];
+  }>();
+
+  const { provider, baseUrl, apiKey, model, messages } = body;
+
+  if (!apiKey) {
+    return c.json({ error: 'API Key 未配置' }, 400);
+  }
+
+  try {
+    if (provider === 'anthropic') {
+      const url = `${baseUrl}/v1/messages`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({ model, messages, max_tokens: 8192, stream: true }),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        return c.json({ error: `Anthropic API error: ${res.status} ${err}` }, res.status as 400);
+      }
+
+      return new Response(res.body, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+      });
+    } else {
+      const url = `${baseUrl}/chat/completions`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ model, messages, temperature: 0.7, stream: true }),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        return c.json({ error: `OpenAI API error: ${res.status} ${err}` }, res.status as 400);
+      }
+
+      return new Response(res.body, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+      });
+    }
+  } catch (err: any) {
+    return c.json({ error: err.message || 'AI 流式请求失败' }, 500);
+  }
+});
+
 const port = 3000;
 console.log(`Server running on http://localhost:${port}`);
 
