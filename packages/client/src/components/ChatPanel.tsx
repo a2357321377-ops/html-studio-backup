@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { FileAttachment } from './FileAttachment';
 import { ChatMessage } from './ChatMessage';
 import { ThemePicker } from './ThemePicker';
 import { useFileParser } from '../hooks/useFileParser';
 import { useAIConfig } from '../hooks/useAIConfig';
+import { useAIChat } from '../hooks/useAIChat';
 import { buildDeckPrompt } from '../lib/ai-client';
 import { streamAI } from '../lib/ai-stream';
 
@@ -11,20 +12,21 @@ interface ChatPanelProps {
   onHtmlUpdate: (html: string) => void;
   onGenerationDone: (html: string) => void;
   onGenerationStart?: () => void;
-  selectedTheme: string;
-  onThemeSelect: (theme: string) => void;
 }
 
-interface Message {
-  role: 'user' | 'ai';
-  content: string;
-}
+export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }: ChatPanelProps) {
+  const messages = useAIChat((s) => s.messages);
+  const addMessage = useAIChat((s) => s.addMessage);
+  const updateMessage = useAIChat((s) => s.updateMessage);
+  const uploadedFile = useAIChat((s) => s.uploadedFile);
+  const setUploadedFile = useAIChat((s) => s.setUploadedFile);
+  const selectedTheme = useAIChat((s) => s.selectedTheme);
+  const setSelectedTheme = useAIChat((s) => s.setSelectedTheme);
+  const generating = useAIChat((s) => s.generating);
+  const setGenerating = useAIChat((s) => s.setGenerating);
+  const deckHtml = useAIChat((s) => s.deckHtml);
+  const setDeckHtml = useAIChat((s) => s.setDeckHtml);
 
-export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart, selectedTheme, onThemeSelect }: ChatPanelProps) {
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [prompt, setPrompt] = useState('');
-  const [generating, setGenerating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { parseResult, parsing, error, parseFile, reset: resetParse } = useFileParser();
   const { connected, apiKey } = useAIConfig();
@@ -33,8 +35,24 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart, s
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // 当 useFileParser 解析完成后，同步到 store
+  useEffect(() => {
+    if (parseResult && uploadedFile) {
+      const fileContent = parseResult.slides.map((s, i) =>
+        `--- 第${i + 1}页 ---\n${s.slots.map(slot => `${slot.label || slot.id}: ${slot.value}`).join('\n')}`
+      ).join('\n\n');
+      setUploadedFile({
+        name: uploadedFile.name,
+        size: uploadedFile.size,
+        pageCount: parseResult.slides.length,
+        content: fileContent,
+      });
+    }
+  }, [parseResult]);
+
   const handleFile = async (file: File) => {
-    setUploadedFile(file);
+    // 先存 File 对象信息到 store（content 后续由 effect 填充）
+    setUploadedFile({ name: file.name, size: file.size, content: '' });
     await parseFile(file);
   };
 
@@ -44,27 +62,26 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart, s
   };
 
   const handleSend = async () => {
-    if (!uploadedFile && !prompt.trim()) return;
+    if (!uploadedFile && !deckHtml) return;
     if (generating) return;
 
-    // 确保有文件内容
-    let fileContent = '';
-    if (uploadedFile) {
-      let result = parseResult;
-      if (!result) {
-        result = await parseFile(uploadedFile);
-      }
-      if (result) {
-        fileContent = result.slides.map((s, i) =>
-          `--- 第${i + 1}页 ---\n${s.slots.map(slot => `${slot.label || slot.id}: ${slot.value}`).join('\n')}`
-        ).join('\n\n');
-      }
+    // 获取文件内容（从 store 中读取已解析的内容）
+    let fileContent = uploadedFile?.content || '';
+    if (!fileContent && parseResult) {
+      fileContent = parseResult.slides.map((s, i) =>
+        `--- 第${i + 1}页 ---\n${s.slots.map(slot => `${slot.label || slot.id}: ${slot.value}`).join('\n')}`
+      ).join('\n\n');
     }
 
+    // 获取用户输入的提示词
+    const promptEl = document.querySelector<HTMLTextAreaElement>('#chat-prompt-input');
+    const userMsg = promptEl?.value?.trim() || '根据上传的文件生成幻灯片';
+
     // 添加用户消息
-    const userMsg = prompt.trim() || '根据上传的文件生成幻灯片';
-    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
-    setPrompt('');
+    const msgId = `msg-${Date.now()}`;
+    addMessage({ id: msgId, role: 'user', content: userMsg });
+    if (promptEl) promptEl.value = '';
+
     setGenerating(true);
     onGenerationStart?.();
 
@@ -72,7 +89,8 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart, s
     const aiMessages = buildDeckPrompt(fileContent, userMsg, selectedTheme);
 
     // 添加 AI 消息占位
-    setMessages(prev => [...prev, { role: 'ai', content: '正在生成幻灯片...' }]);
+    const aiMsgId = `msg-ai-${Date.now()}`;
+    addMessage({ id: aiMsgId, role: 'assistant', content: '正在生成幻灯片...', streaming: true });
 
     let accumulatedHtml = '';
 
@@ -100,26 +118,18 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart, s
 
         // 更新 AI 消息为完成状态
         const slideCount = (cleanHtml.match(/<section[^>]*class="[^"]*slide[^"]*"/g) || []).length;
-        setMessages(prev => {
-          const updated = [...prev];
-          updated[updated.length - 1] = {
-            role: 'ai',
-            content: `生成完成！使用 ${selectedTheme} 主题，共 ${slideCount} 页幻灯片。`,
-          };
-          return updated;
+        updateMessage(aiMsgId, {
+          content: `生成完成！使用 ${selectedTheme} 主题，共 ${slideCount} 页幻灯片。`,
+          streaming: false,
         });
 
         onGenerationDone(cleanHtml);
       },
-      onError: (error) => {
+      onError: (err) => {
         setGenerating(false);
-        setMessages(prev => {
-          const updated = [...prev];
-          updated[updated.length - 1] = {
-            role: 'ai',
-            content: `生成失败：${error}`,
-          };
-          return updated;
+        updateMessage(aiMsgId, {
+          content: `生成失败：${err}`,
+          streaming: false,
         });
       },
     });
@@ -137,8 +147,8 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart, s
       {/* 文件上传区 */}
       {uploadedFile ? (
         <FileAttachment
-          file={uploadedFile}
-          pageCount={parseResult?.slides.length}
+          file={{ name: uploadedFile.name, size: uploadedFile.size }}
+          pageCount={uploadedFile.pageCount}
           onRemove={handleRemoveFile}
         />
       ) : (
@@ -164,7 +174,7 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart, s
 
       {/* 主题选择器 */}
       <div className="px-5 py-2 border-b border-[var(--color-border)]">
-        <ThemePicker selected={selectedTheme} onSelect={onThemeSelect} mode="compact" />
+        <ThemePicker selected={selectedTheme} onSelect={setSelectedTheme} mode="compact" />
       </div>
 
       {/* 对话消息区 */}
@@ -174,12 +184,12 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart, s
             上传文件并输入提示词，AI 将为你生成幻灯片
           </div>
         )}
-        {messages.map((msg, i) => (
+        {messages.map((msg) => (
           <ChatMessage
-            key={i}
-            role={msg.role}
+            key={msg.id}
+            role={msg.role === 'assistant' ? 'ai' : msg.role}
             content={msg.content}
-            streaming={generating && i === messages.length - 1 && msg.role === 'ai'}
+            streaming={generating && msg.streaming}
           />
         ))}
         <div ref={messagesEndRef} />
@@ -196,17 +206,16 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart, s
       <div className="px-5 py-3 border-t border-[var(--color-border)] bg-[var(--color-bg)]">
         <div className="flex gap-2 items-end">
           <textarea
+            id="chat-prompt-input"
             className="flex-1 bg-[var(--color-surface-2)] border border-[var(--color-border)] text-[var(--color-text)] rounded-xl px-3.5 py-2.5 text-[13px] resize-none min-h-[40px] max-h-[100px] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-primary)]"
             placeholder="描述你想要的演示风格，如：做一个深色科技风格的产品发布会..."
-            value={prompt}
-            onChange={e => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
             rows={1}
           />
           <button
             className="w-10 h-10 rounded-xl flex items-center justify-center text-lg text-white shrink-0 disabled:opacity-40"
             style={{ background: 'linear-gradient(135deg, #3b6cff, #7a5cff)' }}
-            disabled={generating || (!uploadedFile && !prompt.trim()) || (!connected && !apiKey)}
+            disabled={generating || (!uploadedFile && !deckHtml) || (!connected && !apiKey)}
             onClick={handleSend}
           >
             ➤

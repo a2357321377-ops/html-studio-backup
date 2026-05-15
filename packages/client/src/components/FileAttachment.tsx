@@ -1,5 +1,5 @@
 interface FileAttachmentProps {
-  file: File;
+  file: { name: string; size: number };
   pageCount?: number;
   onRemove: () => void;
 }

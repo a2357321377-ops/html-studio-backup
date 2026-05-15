@@ -1,13 +1,15 @@
-import { useState } from 'react';
 import { ChatPanel } from '../components/ChatPanel';
 import { PreviewPanel } from '../components/PreviewPanel';
+import { useAIChat } from '../hooks/useAIChat';
 import { useDeck } from '../hooks/useDeck';
 
 export default function Home() {
-  const [selectedTheme, setSelectedTheme] = useState('tokyo-night');
-  const [deckHtml, setDeckHtml] = useState('');
-  const [generating, setGenerating] = useState(false);
-  const setStoreDeckHtml = useDeck(s => s.setDeckHtml);
+  const deckHtml = useAIChat((s) => s.deckHtml);
+  const generating = useAIChat((s) => s.generating);
+  const selectedTheme = useAIChat((s) => s.selectedTheme);
+  const setDeckHtml = useAIChat((s) => s.setDeckHtml);
+  const setGenerating = useAIChat((s) => s.setGenerating);
+  const setStoreDeckHtml = useDeck((s) => s.setDeckHtml);
 
   const handleHtmlUpdate = (html: string) => {
     setDeckHtml(html);
@@ -16,7 +18,7 @@ export default function Home() {
   const handleGenerationDone = (html: string) => {
     setDeckHtml(html);
     setGenerating(false);
-    // 存入 store，供编辑器使用
+    // 同步到 deck store，供编辑器使用
     setStoreDeckHtml(html);
   };
 
@@ -30,8 +32,6 @@ export default function Home() {
         onHtmlUpdate={handleHtmlUpdate}
         onGenerationDone={handleGenerationDone}
         onGenerationStart={handleGenerationStart}
-        selectedTheme={selectedTheme}
-        onThemeSelect={setSelectedTheme}
       />
       <PreviewPanel
         deckHtml={deckHtml}
