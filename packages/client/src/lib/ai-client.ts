@@ -111,3 +111,36 @@ ${slotsDesc}
   if (!match) throw new Error('AI 返回格式异常');
   return JSON.parse(match[0]);
 }
+
+/** AI 生成完整演示文稿 HTML — 构建 prompt */
+export function buildDeckPrompt(fileContent: string, userPrompt: string, theme: string): { role: string; content: string }[] {
+  const systemPrompt = `你是一个演示文稿生成专家。根据用户提供的文档内容和风格要求，生成符合 html-ppt 规范的完整 HTML 演示文稿。
+
+规范要求：
+- 整体结构：<!DOCTYPE html><html><head>引入 CSS/JS</head><body><div class="deck"> 内含多个 <section class="slide">
+- 每个 <section class="slide"> 是一页幻灯片
+- 使用指定的主题 CSS 类（如 theme-tokyo-night）
+- 可用的布局类：layout-cover, layout-section, layout-bullets, layout-numbered-list, layout-two-column, layout-three-column, layout-image-left, layout-image-right, layout-image-full, layout-quote, layout-stats, layout-chart-bar, layout-chart-pie, layout-timeline, layout-comparison, layout-table, layout-code, layout-definition, layout-callout, layout-photo-grid, layout-agenda, layout-team, layout-testimonial, layout-process, layout-map, layout-calendar, layout-metrics, layout-split-text, layout-centered, layout-blank
+- slot 标记：<div data-slot="slotId">内容</div>
+- 引入 CSS：/html-ppt/assets/themes/${theme}.css, /html-ppt/assets/base.css, /html-ppt/assets/fonts.css
+- 引入 JS：/html-ppt/assets/runtime.js
+- 动画 CSS：/html-ppt/assets/animations/animations.css
+- 16:9 比例，每页内容精炼，避免文字过多
+- 第一页 <section> 加上 class="is-active"
+- <style>.slide { display: none; } .slide.is-active { display: flex; }</style>
+- 只输出 HTML 代码，不要输出任何其他文字或 markdown 代码围栏`;
+
+  const userContent = `--- 文档内容 ---
+${fileContent}
+
+--- 风格要求 ---
+${userPrompt || '根据文档内容自动选择最佳风格和布局'}
+
+--- 主题 ---
+${theme}`;
+
+  return [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userContent },
+  ];
+}
