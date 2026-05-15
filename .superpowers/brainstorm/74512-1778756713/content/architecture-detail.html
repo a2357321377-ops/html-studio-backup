@@ -1,0 +1,109 @@
+<h2>HTML Studio — 整体架构</h2>
+<p class="subtitle">Vite + Hono Monorepo，前后端类型共享</p>
+
+<div class="section">
+  <h3>项目结构</h3>
+  <pre><code>html-studio/
+├── packages/
+│   ├── shared/              # 共享类型与配置
+│   │   ├── src/
+│   │   │   ├── types.ts     # Slide, Theme, Animation, Layout 类型定义
+│   │   │   ├── themes.ts    # 36 主题元数据（名称、预览图、适用场景）
+│   │   │   ├── layouts.ts   # 31 布局元数据（名称、缩略图、插槽定义）
+│   │   │   ├── animations.ts # 47 动效元数据（CSS动效 + Canvas FX）
+│   │   │   └── index.ts
+│   │   └── package.json
+│   │
+│   ├── client/              # Vite + React 前端
+│   │   ├── src/
+│   │   │   ├── App.tsx
+│   │   │   ├── pages/
+│   │   │   │   ├── Home.tsx           # 首页：上传入口
+│   │   │   │   ├── Editor.tsx         # 编辑器主界面
+│   │   │   │   └── Preview.tsx        # 全屏预览
+│   │   │   ├── components/
+│   │   │   │   ├── FileUploader.tsx    # 文件上传组件
+│   │   │   │   ├── SlideList.tsx       # 左侧幻灯片列表
+│   │   │   │   ├── SlideCanvas.tsx     # 中间画布（iframe 渲染）
+│   │   │   │   ├── StylePanel.tsx      # 右侧样式面板
+│   │   │   │   ├── ThemePicker.tsx     # 主题选择器
+│   │   │   │   ├── AnimationPicker.tsx # 动效选择器
+│   │   │   │   ├── LayoutPicker.tsx    # 布局选择器
+│   │   │   │   └── ExportDialog.tsx    # 导出对话框
+│   │   │   ├── hooks/
+│   │   │   │   ├── useDeck.ts         # 幻灯片状态管理
+│   │   │   │   └── useFileParser.ts   # 文件解析 hook
+│   │   │   └── lib/
+│   │   │       ├── parser/            # 前端文件解析器
+│   │   │       │   ├── markdown.ts    # Markdown → Slides
+│   │   │       │   ├── txt.ts         # TXT → Slides
+│   │   │       │   ├── pdf.ts         # PDF → Slides (pdf.js)
+│   │   │       │   └── docx.ts        # DOCX → Slides (mammoth.js)
+│   │   │       ├── renderer.ts        # Slides → HTML 生成器
+│   │   │       └── template-engine.ts # 模板引擎
+│   │   ├── public/
+│   │   │   └── html-ppt/             # html-ppt 静态资源（主题/动效/运行时）
+│   │   └── package.json
+│   │
+│   └── server/              # Hono 后端
+│       ├── src/
+│       │   ├── index.ts      # Hono app 入口
+│       │   ├── routes/
+│       │   │   ├── upload.ts  # 文件上传 API
+│       │   │   ├── generate.ts # AI 生成 API（预留）
+│       │   │   └── export.ts  # 导出 API
+│       │   ├── services/
+│       │   │   ├── file-parser.ts  # 服务端文件解析
+│       │   │   └── ai-service.ts   # AI 调用服务（预留）
+│       │   └── middleware/
+│       │       └── cors.ts
+│       └── package.json
+│
+├── turbo.json               # Turborepo 配置
+├── package.json              # Workspace root
+└── tsconfig.base.json</code></pre>
+</div>
+
+<div class="section" style="margin-top:32px">
+  <h3>核心数据流</h3>
+  <pre><code>┌─────────────┐     ┌──────────────┐     ┌──────────────┐
+│  用户上传文件  │────▶│  前端解析器    │────▶│  Slide[] 数据  │
+│  PDF/MD/TXT  │     │  (浏览器端)    │     │  (结构化内容)  │
+└─────────────┘     └──────────────┘     └──────┬───────┘
+                                                 │
+                    ┌────────────────────────────┤
+                    ▼                            ▼
+          ┌──────────────┐            ┌──────────────┐
+          │  选择模板/主题  │            │  AI 智能拆分   │
+          │  (用户操作)    │            │  (预留接口)    │
+          └──────┬───────┘            └──────┬───────┘
+                 │                           │
+                 ▼                           │
+          ┌──────────────┐                   │
+          │  模板引擎渲染   │◀──────────────────┘
+          │  Slides → HTML│
+          └──────┬───────┘
+                 │
+                 ▼
+          ┌──────────────┐     ┌──────────────┐
+          │  iframe 预览   │────▶│  可视化编辑    │
+          │  (实时渲染)    │     │  (内容+样式)   │
+          └──────────────┘     └──────┬───────┘
+                                       │
+                                       ▼
+                                ┌──────────────┐
+                                │  导出 HTML    │
+                                │  (静态文件)    │
+                                └──────────────┘</code></pre>
+</div>
+
+<div class="section" style="margin-top:24px;padding:16px;background:var(--surface-2);border-radius:12px">
+  <h3>关键设计决策</h3>
+  <ul>
+    <li><strong>前端解析优先</strong>：Markdown/TXT 纯前端解析，PDF 用 pdf.js，DOCX 用 mammoth.js，无需后端</li>
+    <li><strong>iframe 预览</strong>：编辑器中间画布用 iframe 渲染真实 HTML，保证所见即所得</li>
+    <li><strong>html-ppt 资源作为 public assets</strong>：主题 CSS、动效 CSS/JS、runtime.js 直接复制到 client/public</li>
+    <li><strong>Slide 数据结构驱动</strong>：所有编辑操作修改 Slide[] 数据，再由模板引擎重新渲染 HTML</li>
+    <li><strong>后端预留 AI 接口</strong>：当前只做文件上传代理，AI 智能拆分作为后续增强</li>
+  </ul>
+</div>

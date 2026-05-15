@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+:root {
+  --color-primary: #3b6cff;
+  --color-primary-2: #7a5cff;
+  --color-primary-3: #ff5c8a;
+  --color-surface: #1a1a2e;
+  --color-surface-2: #252540;
+  --color-bg: #0d0d1a;
+  --color-border: #333;
+  --color-text: #eee;
+  --color-text-dim: #888;
+  --color-text-dim2: #666;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  margin: 0;
+}
+
+* {
+  box-sizing: border-box;
+}

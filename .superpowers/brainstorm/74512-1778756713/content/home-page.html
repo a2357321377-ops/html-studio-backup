@@ -1,0 +1,98 @@
+<h2>首页设计 — 上传与生成</h2>
+<p class="subtitle">用户进入应用的第一步：上传文件、选择风格、生成幻灯片</p>
+
+<div class="section">
+  <div class="mockup">
+    <div class="mockup-header">首页 — 上传流程</div>
+    <div class="mockup-body" style="min-height:500px;background:linear-gradient(135deg,#0d0d1a,#1a1a3e);color:#eee;padding:32px;display:flex;flex-direction:column;align-items:center">
+      <!-- 顶部导航 -->
+      <div style="width:100%;max-width:720px;display:flex;justify-content:space-between;align-items:center;margin-bottom:48px">
+        <div style="font-size:18px;font-weight:700">
+          <span style="color:#3b6cff">HTML</span> Studio
+        </div>
+        <div style="display:flex;gap:12px;font-size:12px;color:#888">
+          <span style="cursor:pointer">示例</span>
+          <span style="cursor:pointer">帮助</span>
+        </div>
+      </div>
+
+      <!-- 标题区 -->
+      <div style="text-align:center;margin-bottom:36px">
+        <div style="font-size:28px;font-weight:700;margin-bottom:8px">上传文档，生成演示</div>
+        <div style="font-size:13px;color:#888">支持 PDF、Markdown、TXT、Word — AI 智能拆分，一键生成精美幻灯片</div>
+      </div>
+
+      <!-- 上传区域 -->
+      <div style="width:100%;max-width:520px;border:2px dashed #3b6cff55;border-radius:16px;padding:40px;text-align:center;background:#3b6cff08;margin-bottom:28px;cursor:pointer">
+        <div style="font-size:36px;margin-bottom:8px">📄</div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:4px">拖拽文件到这里，或点击上传</div>
+        <div style="font-size:11px;color:#888">支持 .pdf .md .txt .docx，最大 20MB</div>
+        <div style="margin-top:16px">
+          <button style="background:#3b6cff;color:#fff;border:none;border-radius:8px;padding:8px 24px;font-size:12px;cursor:pointer;font-weight:600">选择文件</button>
+        </div>
+      </div>
+
+      <!-- 已上传文件预览 -->
+      <div style="width:100%;max-width:520px;background:#252540;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;margin-bottom:28px">
+        <div style="width:36px;height:36px;background:#3b6cff22;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px">📝</div>
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:600">产品介绍.md</div>
+          <div style="font-size:10px;color:#888">2.3 KB · Markdown · 3 个标题段落</div>
+        </div>
+        <div style="color:#3b6cff;font-size:10px;cursor:pointer">✕ 移除</div>
+      </div>
+
+      <!-- 风格选择 -->
+      <div style="width:100%;max-width:520px;margin-bottom:28px">
+        <div style="font-size:12px;font-weight:600;margin-bottom:10px">选择风格</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <div style="background:#252540;border-radius:8px;padding:10px;cursor:pointer;border:2px solid #3b6cff;text-align:center">
+            <div style="height:40px;background:linear-gradient(135deg,#1a1a3e,#2a1a3e);border-radius:4px;margin-bottom:6px"></div>
+            <div style="font-size:10px;font-weight:600">Tokyo Night</div>
+            <div style="font-size:9px;color:#888">技术分享</div>
+          </div>
+          <div style="background:#252540;border-radius:8px;padding:10px;cursor:pointer;border:1px solid #444;text-align:center">
+            <div style="height:40px;background:#fff;border-radius:4px;margin-bottom:6px"></div>
+            <div style="font-size:10px;font-weight:600">Minimal White</div>
+            <div style="font-size:9px;color:#888">正式汇报</div>
+          </div>
+          <div style="background:#252540;border-radius:8px;padding:10px;cursor:pointer;border:1px solid #444;text-align:center">
+            <div style="height:40px;background:linear-gradient(135deg,#ffecd2,#fcb69f);border-radius:4px;margin-bottom:6px"></div>
+            <div style="font-size:10px;font-weight:600">Sunset Warm</div>
+            <div style="font-size:9px;color:#888">生活方式</div>
+          </div>
+        </div>
+        <div style="font-size:9px;color:#666;margin-top:6px;text-align:right">查看全部 36 个主题 →</div>
+      </div>
+
+      <!-- 生成按钮 -->
+      <div style="width:100%;max-width:520px">
+        <button style="width:100%;background:linear-gradient(135deg,#3b6cff,#7a5cff);color:#fff;border:none;border-radius:10px;padding:14px;font-size:14px;cursor:pointer;font-weight:700;letter-spacing:1px">
+          ✨ 生成幻灯片
+        </button>
+        <div style="text-align:center;margin-top:8px;font-size:10px;color:#666">AI 将智能拆分内容并匹配最佳布局</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px">
+  <h3>首页交互流程</h3>
+  <pre><code>1. 拖拽或点击上传文件
+2. 前端解析文件，显示文件信息（名称、大小、段落数）
+3. 选择风格主题（默认推荐 3 个，可展开查看全部 36 个）
+4. 点击「生成幻灯片」
+5. 前端解析器将文件内容拆分为 Slide[]
+6. 模板引擎根据主题+布局渲染 HTML
+7. 跳转到编辑器页面，左侧显示幻灯片列表，中间显示预览</code></pre>
+</div>
+
+<div class="section" style="margin-top:16px;padding:16px;background:var(--surface-2);border-radius:12px">
+  <h3>文件解析策略</h3>
+  <ul>
+    <li><strong>Markdown</strong>：按 H1/H2 标题拆分页面，H1=封面，H2=新页面，段落/列表=页面内容</li>
+    <li><strong>TXT</strong>：按空行分段，每段一页；超过 200 字自动拆分</li>
+    <li><strong>PDF</strong>：pdf.js 提取文字，按页拆分，图片提取为 base64</li>
+    <li><strong>DOCX</strong>：mammoth.js 转 HTML，再按标题结构拆分</li>
+  </ul>
+</div>

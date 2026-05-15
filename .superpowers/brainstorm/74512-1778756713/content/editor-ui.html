@@ -1,0 +1,153 @@
+<h2>编辑器界面设计</h2>
+<p class="subtitle">三栏布局：幻灯片列表 | 画布预览 | 样式面板</p>
+
+<div class="section">
+  <div class="mockup">
+    <div class="mockup-header">编辑器主界面 — 三栏布局</div>
+    <div class="mockup-body" style="display:flex;height:420px;font-size:12px;gap:0">
+      <!-- 左栏：幻灯片列表 -->
+      <div style="width:200px;background:#1a1a2e;color:#eee;padding:12px;border-right:1px solid #333;display:flex;flex-direction:column">
+        <div style="font-weight:600;margin-bottom:8px;font-size:13px">📑 幻灯片</div>
+        <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
+          <div style="background:#3b6cff;border-radius:6px;padding:8px;cursor:pointer">
+            <div style="height:60px;background:#252540;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:10px">封面页</div>
+            <div style="margin-top:4px;font-size:10px;color:#ccc">01 · 封面</div>
+          </div>
+          <div style="background:#252540;border-radius:6px;padding:8px;cursor:pointer">
+            <div style="height:60px;background:#1a1a2e;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#666;font-size:10px">目录页</div>
+            <div style="margin-top:4px;font-size:10px;color:#888">02 · 目录</div>
+          </div>
+          <div style="background:#252540;border-radius:6px;padding:8px;cursor:pointer">
+            <div style="height:60px;background:#1a1a2e;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#666;font-size:10px">内容页</div>
+            <div style="margin-top:4px;font-size:10px;color:#888">03 · 要点</div>
+          </div>
+          <div style="background:#252540;border-radius:6px;padding:8px;cursor:pointer">
+            <div style="height:60px;background:#1a1a2e;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#666;font-size:10px">数据页</div>
+            <div style="margin-top:4px;font-size:10px;color:#888">04 · KPI</div>
+          </div>
+          <div style="background:#252540;border-radius:6px;padding:8px;cursor:pointer">
+            <div style="height:60px;background:#1a1a2e;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#666;font-size:10px">结尾页</div>
+            <div style="margin-top:4px;font-size:10px;color:#888">05 · 致谢</div>
+          </div>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:4px">
+          <button style="flex:1;background:#3b6cff;color:#fff;border:none;border-radius:4px;padding:4px;font-size:10px;cursor:pointer">+ 添加</button>
+        </div>
+      </div>
+
+      <!-- 中栏：画布预览 -->
+      <div style="flex:1;background:#0d0d1a;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative">
+        <div style="position:absolute;top:8px;left:12px;display:flex;gap:6px;font-size:10px">
+          <span style="background:#252540;color:#aaa;padding:2px 8px;border-radius:4px">100%</span>
+          <span style="background:#252540;color:#aaa;padding:2px 8px;border-radius:4px">16:9</span>
+        </div>
+        <div style="width:480px;height:270px;background:linear-gradient(135deg,#1a1a3e,#2a1a3e);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;box-shadow:0 8px 32px rgba(0,0,0,.4)">
+          <div style="font-size:11px;color:#7a5cff;letter-spacing:2px;margin-bottom:6px">TECH SHARING</div>
+          <div style="font-size:22px;font-weight:700;margin-bottom:4px">HTML Studio 介绍</div>
+          <div style="font-size:10px;color:#888">从文档到演示，一键生成</div>
+          <div style="margin-top:12px;display:flex;gap:6px">
+            <span style="background:rgba(59,108,255,.2);color:#3b6cff;padding:2px 8px;border-radius:10px;font-size:9px">React</span>
+            <span style="background:rgba(122,92,255,.2);color:#7a5cff;padding:2px 8px;border-radius:10px;font-size:9px">Hono</span>
+            <span style="background:rgba(255,92,138,.2);color:#ff5c8a;padding:2px 8px;border-radius:10px;font-size:9px">html-ppt</span>
+          </div>
+        </div>
+        <div style="position:absolute;bottom:8px;display:flex;gap:8px;font-size:10px;color:#666">
+          <span>◀</span><span style="color:#aaa">2 / 5</span><span>▶</span>
+          <span style="margin-left:12px">⛶ 全屏</span>
+        </div>
+      </div>
+
+      <!-- 右栏：样式面板 -->
+      <div style="width:240px;background:#1a1a2e;color:#eee;padding:12px;border-left:1px solid #333;display:flex;flex-direction:column;overflow-y:auto">
+        <div style="font-weight:600;margin-bottom:12px;font-size:13px">🎨 样式</div>
+
+        <!-- 主题选择 -->
+        <div style="margin-bottom:16px">
+          <div style="font-size:10px;color:#888;margin-bottom:6px">主题</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
+            <div style="height:28px;background:linear-gradient(135deg,#1a1a3e,#2a1a3e);border-radius:4px;border:2px solid #3b6cff;cursor:pointer"></div>
+            <div style="height:28px;background:#fff;border-radius:4px;border:1px solid #444;cursor:pointer"></div>
+            <div style="height:28px;background:linear-gradient(135deg,#ffecd2,#fcb69f);border-radius:4px;border:1px solid #444;cursor:pointer"></div>
+            <div style="height:28px;background:#282a36;border-radius:4px;border:1px solid #444;cursor:pointer"></div>
+            <div style="height:28px;background:linear-gradient(135deg,#a18cd1,#fbc2eb);border-radius:4px;border:1px solid #444;cursor:pointer"></div>
+            <div style="height:28px;background:linear-gradient(135deg,#0f0c29,#302b63);border-radius:4px;border:1px solid #444;cursor:pointer"></div>
+          </div>
+          <div style="font-size:9px;color:#666;margin-top:4px">当前：tokyo-night · 点击切换</div>
+        </div>
+
+        <!-- 布局选择 -->
+        <div style="margin-bottom:16px">
+          <div style="font-size:10px;color:#888;margin-bottom:6px">布局</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+            <div style="height:32px;background:#252540;border-radius:4px;border:2px solid #3b6cff;display:flex;align-items:center;justify-content:center;font-size:8px;color:#aaa;cursor:pointer">封面</div>
+            <div style="height:32px;background:#252540;border-radius:4px;border:1px solid #444;display:flex;align-items:center;justify-content:center;font-size:8px;color:#888;cursor:pointer">要点</div>
+            <div style="height:32px;background:#252540;border-radius:4px;border:1px solid #444;display:flex;align-items:center;justify-content:center;font-size:8px;color:#888;cursor:pointer">双栏</div>
+            <div style="height:32px;background:#252540;border-radius:4px;border:1px solid #444;display:flex;align-items:center;justify-content:center;font-size:8px;color:#888;cursor:pointer">数据</div>
+          </div>
+        </div>
+
+        <!-- 动效选择 -->
+        <div style="margin-bottom:16px">
+          <div style="font-size:10px;color:#888;margin-bottom:6px">入场动效</div>
+          <select style="width:100%;background:#252540;color:#ccc;border:1px solid #444;border-radius:4px;padding:4px;font-size:10px">
+            <option>fade-up（默认）</option>
+            <option>rise-in</option>
+            <option>zoom-pop</option>
+            <option>blur-in</option>
+            <option>glitch-in</option>
+            <option>typewriter</option>
+          </select>
+        </div>
+
+        <!-- Canvas FX -->
+        <div style="margin-bottom:16px">
+          <div style="font-size:10px;color:#888;margin-bottom:6px">背景特效 (FX)</div>
+          <div style="display:flex;flex-wrap:wrap;gap:3px">
+            <span style="background:#252540;color:#888;padding:2px 6px;border-radius:3px;font-size:9px;cursor:pointer">无</span>
+            <span style="background:#3b6cff33;color:#3b6cff;padding:2px 6px;border-radius:3px;font-size:9px;cursor:pointer">粒子</span>
+            <span style="background:#252540;color:#888;padding:2px 6px;border-radius:3px;font-size:9px;cursor:pointer">星场</span>
+            <span style="background:#252540;color:#888;padding:2px 6px;border-radius:3px;font-size:9px;cursor:pointer">知识图谱</span>
+            <span style="background:#252540;color:#888;padding:2px 6px;border-radius:3px;font-size:9px;cursor:pointer">烟花</span>
+          </div>
+        </div>
+
+        <!-- 内容编辑 -->
+        <div style="margin-bottom:16px">
+          <div style="font-size:10px;color:#888;margin-bottom:6px">内容编辑</div>
+          <div style="background:#252540;border-radius:4px;padding:8px">
+            <div style="margin-bottom:6px">
+              <label style="font-size:9px;color:#666">标题</label>
+              <input style="width:100%;background:#1a1a2e;border:1px solid #444;color:#eee;border-radius:3px;padding:3px 6px;font-size:10px" value="HTML Studio 介绍">
+            </div>
+            <div style="margin-bottom:6px">
+              <label style="font-size:9px;color:#666">副标题</label>
+              <input style="width:100%;background:#1a1a2e;border:1px solid #444;color:#eee;border-radius:3px;padding:3px 6px;font-size:10px" value="从文档到演示，一键生成">
+            </div>
+            <div>
+              <label style="font-size:9px;color:#666">标签</label>
+              <input style="width:100%;background:#1a1a2e;border:1px solid #444;color:#eee;border-radius:3px;padding:3px 6px;font-size:10px" value="React, Hono, html-ppt">
+            </div>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div style="margin-top:auto;display:flex;flex-direction:column;gap:6px">
+          <button style="background:#3b6cff;color:#fff;border:none;border-radius:6px;padding:8px;font-size:11px;cursor:pointer;font-weight:600">📥 导出 HTML</button>
+          <button style="background:#252540;color:#aaa;border:1px solid #444;border-radius:6px;padding:6px;font-size:10px;cursor:pointer">⛶ 全屏预览</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px">
+  <h3>交互流程</h3>
+  <pre><code>1. 首页：上传文件 → 选择主题 → 点击「生成」
+2. 编辑器：
+   - 左栏：幻灯片缩略图列表，支持拖拽排序、添加/删除
+   - 中栏：iframe 实时预览，点击元素进入编辑状态
+   - 右栏：样式面板（主题/布局/动效/内容编辑）
+3. 点击幻灯片 → 右侧面板显示该页的属性
+4. 修改任何属性 → iframe 自动刷新预览
+5. 导出：生成完整 HTML 文件下载</code></pre>
+</div>

@@ -1,0 +1,100 @@
+<h2>用户设置页面设计</h2>
+<p class="subtitle">方案 B 顶栏风格 — 点击齿轮图标进入独立设置页</p>
+
+<div class="mockup">
+  <div class="mockup-header">设置页面完整布局</div>
+  <div class="mockup-body" style="background:#0d0d1a;color:#eee;font-family:Inter,sans-serif;padding:0;min-height:500px;">
+    <!-- 导航栏 -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 24px;background:#1a1a2e;border-bottom:1px solid #333;">
+      <div style="display:flex;align-items:center;gap:24px;">
+        <span style="font-weight:700;"><span style="color:#3b6cff;">HTML</span> Studio</span>
+        <div style="display:flex;gap:2px;">
+          <span style="padding:6px 16px;border-radius:8px 8px 0 0;font-size:13px;color:#888;background:#252540;">文件对话</span>
+          <span style="padding:6px 16px;border-radius:8px 8px 0 0;font-size:13px;color:#888;background:#252540;">编辑</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:8px;background:#252540;border:1px solid #333;cursor:pointer;">
+          <div style="width:8px;height:8px;border-radius:50%;background:#4ade80;"></div>
+          <span style="font-size:11px;color:#ccc;">AI 已连接</span>
+          <span style="font-size:10px;color:#888;">▾</span>
+        </div>
+        <div style="width:32px;height:32px;border-radius:50%;background:#3b6cff;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;color:white;">⚙</div>
+      </div>
+    </div>
+
+    <!-- 设置页面内容 -->
+    <div style="max-width:560px;margin:32px auto;padding:0 24px;">
+      <div style="font-size:20px;font-weight:700;margin-bottom:24px;">用户设置</div>
+
+      <!-- AI 模型配置区 -->
+      <div style="background:#1a1a2e;border:1px solid #333;border-radius:12px;padding:20px;margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:#4ade80;"></div>
+          <span style="font-size:14px;font-weight:600;">AI 模型配置</span>
+        </div>
+
+        <!-- API 类型选择 -->
+        <div style="margin-bottom:16px;">
+          <div style="font-size:11px;color:#888;margin-bottom:6px;">API 类型</div>
+          <div style="display:flex;gap:8px;">
+            <div style="padding:8px 16px;border-radius:8px;background:#3b6cff;color:white;font-size:12px;font-weight:600;cursor:pointer;">OpenAI 兼容</div>
+            <div style="padding:8px 16px;border-radius:8px;background:#252540;border:1px solid #333;font-size:12px;color:#888;cursor:pointer;">Anthropic Claude</div>
+          </div>
+        </div>
+
+        <!-- API Base URL -->
+        <div style="margin-bottom:12px;">
+          <div style="font-size:11px;color:#888;margin-bottom:4px;">API Base URL</div>
+          <div style="background:#252540;border:1px solid #333;border-radius:8px;padding:8px 12px;font-size:13px;color:#ccc;">https://api.openai.com/v1</div>
+        </div>
+
+        <!-- API Key -->
+        <div style="margin-bottom:12px;">
+          <div style="font-size:11px;color:#888;margin-bottom:4px;">API Key</div>
+          <div style="background:#252540;border:1px solid #333;border-radius:8px;padding:8px 12px;font-size:13px;color:#888;">sk-••••••••••••••••••••••••••••••</div>
+          <div style="font-size:10px;color:#666;margin-top:4px;">Key 仅存储在浏览器本地，不会上传到服务器</div>
+        </div>
+
+        <!-- 模型名称 -->
+        <div style="margin-bottom:16px;">
+          <div style="font-size:11px;color:#888;margin-bottom:4px;">模型名称</div>
+          <div style="background:#252540;border:1px solid #333;border-radius:8px;padding:8px 12px;font-size:13px;color:#ccc;">gpt-4o</div>
+        </div>
+
+        <!-- 连接测试 -->
+        <div style="display:flex;gap:8px;">
+          <div style="padding:8px 16px;border-radius:8px;background:#3b6cff;color:white;font-size:12px;font-weight:600;cursor:pointer;">测试连接</div>
+          <div style="padding:8px 16px;border-radius:8px;background:#252540;border:1px solid #333;font-size:12px;color:#888;cursor:pointer;">保存配置</div>
+        </div>
+      </div>
+
+      <!-- AI 功能开关 -->
+      <div style="background:#1a1a2e;border:1px solid #333;border-radius:12px;padding:20px;margin-bottom:20px;">
+        <div style="font-size:14px;font-weight:600;margin-bottom:16px;">AI 功能</div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #333;">
+          <div>
+            <div style="font-size:13px;">自动排版生成</div>
+            <div style="font-size:11px;color:#888;">上传文档后 AI 自动选择布局和主题</div>
+          </div>
+          <div style="width:40px;height:22px;border-radius:11px;background:#3b6cff;position:relative;cursor:pointer;">
+            <div style="width:18px;height:18px;border-radius:50%;background:white;position:absolute;right:2px;top:2px;"></div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;">
+          <div>
+            <div style="font-size:13px;">编辑器 AI 优化</div>
+            <div style="font-size:11px;color:#888;">在编辑器中让 AI 优化单页内容</div>
+          </div>
+          <div style="width:40px;height:22px;border-radius:11px;background:#3b6cff;position:relative;cursor:pointer;">
+            <div style="width:18px;height:18px;border-radius:50%;background:white;position:absolute;right:2px;top:2px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px;">设置页面包含两大区块：<strong>AI 模型配置</strong>（API 类型切换、URL、Key、模型名、连接测试）和<strong>AI 功能开关</strong>（自动排版 / 编辑器优化）。Key 输入框默认遮罩显示，仅存 localStorage。</p>
