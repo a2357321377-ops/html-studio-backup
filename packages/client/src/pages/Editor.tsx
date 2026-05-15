@@ -11,6 +11,8 @@ export default function Editor() {
   const navigate = useNavigate();
   const deck = useDeck(s => s.deck);
   const currentSlideIndex = useDeck(s => s.currentSlideIndex);
+  const isAiDeck = useDeck(s => s.isAiDeck);
+  const deckHtml = useDeck(s => s.deckHtml);
   const [exportOpen, setExportOpen] = useState(false);
 
   if (!deck || deck.slides.length === 0) {
@@ -27,7 +29,7 @@ export default function Editor() {
   return (
     <div className="flex-1 flex overflow-hidden">
       <SlideList />
-      <SlideCanvas deck={deck} currentSlideIndex={currentSlideIndex} />
+      <SlideCanvas deck={deck} currentSlideIndex={currentSlideIndex} deckHtml={isAiDeck ? deckHtml : null} />
       <div className="flex flex-col">
         <StylePanel />
         <div className="p-2 border-l border-[var(--color-border)] bg-[var(--color-surface)]">

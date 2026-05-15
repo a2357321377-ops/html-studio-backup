@@ -5,9 +5,10 @@ import { renderDeck } from '../lib/renderer';
 interface SlideCanvasProps {
   deck: Deck;
   currentSlideIndex: number;
+  deckHtml?: string | null;
 }
 
-export function SlideCanvas({ deck, currentSlideIndex }: SlideCanvasProps) {
+export function SlideCanvas({ deck, currentSlideIndex, deckHtml }: SlideCanvasProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [html, setHtml] = useState('');
@@ -36,6 +37,14 @@ export function SlideCanvas({ deck, currentSlideIndex }: SlideCanvasProps) {
 
   useEffect(() => {
     let cancelled = false;
+
+    if (deckHtml) {
+      // AI 生成的 HTML 直接使用
+      setHtml(deckHtml);
+      setRendering(false);
+      return;
+    }
+
     setRendering(true);
     renderDeck(deck, { includeRuntime: true, includeAnimations: true, includeFx: true }).then(result => {
       if (!cancelled) {
@@ -44,7 +53,7 @@ export function SlideCanvas({ deck, currentSlideIndex }: SlideCanvasProps) {
       }
     });
     return () => { cancelled = true; };
-  }, [deck]);
+  }, [deck, deckHtml]);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -54,7 +63,9 @@ export function SlideCanvas({ deck, currentSlideIndex }: SlideCanvasProps) {
     } catch { /* iframe not ready */ }
   }, [currentSlideIndex, html]);
 
-  const totalSlides = deck.slides.length;
+  const totalSlides = deckHtml
+    ? (deckHtml.match(/<section[^>]*class="[^"]*slide[^"]*"/g) || []).length
+    : deck.slides.length;
 
   return (
     <div ref={containerRef} className="flex-1 bg-[var(--color-bg)] flex flex-col items-center justify-center relative overflow-hidden">

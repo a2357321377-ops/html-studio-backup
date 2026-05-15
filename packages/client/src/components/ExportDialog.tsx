@@ -10,6 +10,8 @@ interface ExportDialogProps {
 
 export function ExportDialog({ open, onClose }: ExportDialogProps) {
   const deck = useDeck(s => s.deck);
+  const isAiDeck = useDeck(s => s.isAiDeck);
+  const deckHtml = useDeck(s => s.deckHtml);
   const [filename, setFilename] = useState('');
   const [includeRuntime, setIncludeRuntime] = useState(true);
   const [includeAnimations, setIncludeAnimations] = useState(true);
@@ -20,16 +22,23 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
   const defaultFilename = deck ? `${deck.title.replace(/\s+/g, '-')}.html` : 'presentation.html';
 
   const handleExport = async () => {
-    if (!deck) return;
+    if (!deck && !isAiDeck) return;
     setExporting(true);
     try {
-      const html = await renderDeck(deck, {
-        includeRuntime,
-        includeAnimations,
-        includeFx: includeAnimations,
-        includePresenter,
-        includeSourceData,
-      });
+      let html: string;
+      if (isAiDeck && deckHtml) {
+        html = deckHtml;
+      } else if (deck) {
+        html = await renderDeck(deck, {
+          includeRuntime,
+          includeAnimations,
+          includeFx: includeAnimations,
+          includePresenter,
+          includeSourceData,
+        });
+      } else {
+        return;
+      }
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
