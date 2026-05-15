@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { AIStatusIndicator } from './AIStatusIndicator';
 
 const TABS = [
-  { path: '/', label: '文件对话' },
+  { path: '/', label: 'AI 创作' },
   { path: '/editor', label: '编辑' },
   { path: '/settings', label: '设置' },
 ];
