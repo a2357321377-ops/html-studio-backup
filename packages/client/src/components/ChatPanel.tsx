@@ -1,7 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { FileAttachment } from './FileAttachment';
 import { ChatMessage } from './ChatMessage';
-import { ThemePicker } from './ThemePicker';
 import { useFileParser } from '../hooks/useFileParser';
 import { useAIConfig } from '../hooks/useAIConfig';
 import { useAIChat } from '../hooks/useAIChat';
@@ -20,8 +19,6 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
   const updateMessage = useAIChat((s) => s.updateMessage);
   const uploadedFile = useAIChat((s) => s.uploadedFile);
   const setUploadedFile = useAIChat((s) => s.setUploadedFile);
-  const selectedTheme = useAIChat((s) => s.selectedTheme);
-  const setSelectedTheme = useAIChat((s) => s.setSelectedTheme);
   const generating = useAIChat((s) => s.generating);
   const setGenerating = useAIChat((s) => s.setGenerating);
   const deckHtml = useAIChat((s) => s.deckHtml);
@@ -85,8 +82,8 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
     setGenerating(true);
     onGenerationStart?.();
 
-    // 构建 AI prompt
-    const aiMessages = buildDeckPrompt(fileContent, userMsg, selectedTheme);
+    // 构建 AI prompt（不指定主题，让 AI 自行选择）
+    const aiMessages = buildDeckPrompt(fileContent, userMsg);
 
     // 添加 AI 消息占位
     const aiMsgId = `msg-ai-${Date.now()}`;
@@ -119,7 +116,7 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
         // 更新 AI 消息为完成状态
         const slideCount = (cleanHtml.match(/<section[^>]*class="[^"]*slide[^"]*"/g) || []).length;
         updateMessage(aiMsgId, {
-          content: `生成完成！使用 ${selectedTheme} 主题，共 ${slideCount} 页幻灯片。`,
+          content: `生成完成！共 ${slideCount} 页幻灯片。`,
           streaming: false,
         });
 
@@ -171,11 +168,6 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
           </button>
         </div>
       )}
-
-      {/* 主题选择器 */}
-      <div className="px-5 py-2 border-b border-[var(--color-border)]">
-        <ThemePicker selected={selectedTheme} onSelect={setSelectedTheme} mode="compact" />
-      </div>
 
       {/* 对话消息区 */}
       <div className="flex-1 overflow-y-auto px-5 py-4">

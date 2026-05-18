@@ -26,10 +26,6 @@ interface AIChatState {
   uploadedFile: UploadedFile | null;
   setUploadedFile: (file: UploadedFile | null) => void;
 
-  // 主题选择
-  selectedTheme: string;
-  setSelectedTheme: (theme: string) => void;
-
   // 生成状态
   generating: boolean;
   setGenerating: (g: boolean) => void;
@@ -56,9 +52,6 @@ export const useAIChat = create<AIChatState>()(
 
       uploadedFile: null,
       setUploadedFile: (file) => set({ uploadedFile: file }),
-
-      selectedTheme: 'tokyo-night',
-      setSelectedTheme: (theme) => set({ selectedTheme: theme }),
 
       generating: false,
       setGenerating: (g) => set({ generating: g }),

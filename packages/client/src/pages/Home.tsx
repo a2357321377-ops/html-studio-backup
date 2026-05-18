@@ -6,7 +6,6 @@ import { useDeck } from '../hooks/useDeck';
 export default function Home() {
   const deckHtml = useAIChat((s) => s.deckHtml);
   const generating = useAIChat((s) => s.generating);
-  const selectedTheme = useAIChat((s) => s.selectedTheme);
   const setDeckHtml = useAIChat((s) => s.setDeckHtml);
   const setGenerating = useAIChat((s) => s.setGenerating);
   const setStoreDeckHtml = useDeck((s) => s.setDeckHtml);
@@ -36,7 +35,6 @@ export default function Home() {
       <PreviewPanel
         deckHtml={deckHtml}
         generating={generating}
-        selectedTheme={selectedTheme}
       />
     </div>
   );

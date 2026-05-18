@@ -113,7 +113,7 @@ ${slotsDesc}
 }
 
 /** AI 生成完整演示文稿 HTML — 构建 prompt */
-export function buildDeckPrompt(fileContent: string, userPrompt: string, theme: string): { role: string; content: string }[] {
+export function buildDeckPrompt(fileContent: string, userPrompt: string): { role: string; content: string }[] {
   const systemPrompt = `你是一个演示文稿生成专家。根据用户提供的文档内容和风格要求，生成符合 html-ppt 规范的完整 HTML 演示文稿。
 
 ## 文档结构要求
@@ -127,10 +127,19 @@ export function buildDeckPrompt(fileContent: string, userPrompt: string, theme: 
 ## CSS/JS 引入（必须按此顺序）
 <link rel="stylesheet" href="/html-ppt/assets/fonts.css">
 <link rel="stylesheet" href="/html-ppt/assets/base.css">
-<link rel="stylesheet" id="theme-link" href="/html-ppt/assets/themes/${theme}.css">
+<link rel="stylesheet" id="theme-link" href="/html-ppt/assets/themes/你选择的主题.css">
 <link rel="stylesheet" href="/html-ppt/assets/animations/animations.css">
 ...
 <script src="/html-ppt/assets/runtime.js"></script>
+
+## 主题选择
+根据用户提示词和文档内容，自行选择最合适的主题。可用的主题：
+tokyo-night, minimal-white, aurora, catppuccin-mocha, xiaohongshu-white, neo-brutalism,
+github-dark, dracula, nord, solarized-dark, solarized-light, monokai, ocean-dark,
+cyberpunk, matrix, retro-terminal, slate, ember, forest, desert, arctic, lavender,
+rose-garden, midnight-blue, deep-space, candy, pastel, high-contrast, newspaper,
+warm-earth, cool-breeze, vibrant
+在 <link id="theme-link"> 中填入你选择的主题名。
 
 ## 可用的 CSS 类（这些是 base.css 中真实定义的类，必须使用它们来排版）
 
@@ -313,10 +322,7 @@ export function buildDeckPrompt(fileContent: string, userPrompt: string, theme: 
 ${fileContent}
 
 --- 风格要求 ---
-${userPrompt || '根据文档内容自动选择最佳风格和布局'}
-
---- 主题 ---
-${theme}`;
+${userPrompt || '根据文档内容自动选择最佳风格、主题和布局'}`;
 
   return [
     { role: 'system', content: systemPrompt },

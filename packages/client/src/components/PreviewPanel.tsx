@@ -4,10 +4,9 @@ import { useNavigate } from 'react-router-dom';
 interface PreviewPanelProps {
   deckHtml: string;
   generating: boolean;
-  selectedTheme: string;
 }
 
-export function PreviewPanel({ deckHtml, generating, selectedTheme }: PreviewPanelProps) {
+export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -34,6 +33,30 @@ export function PreviewPanel({ deckHtml, generating, selectedTheme }: PreviewPan
     return () => observer.disconnect();
   }, [updateScale]);
 
+  // iframe 加载完成后，恢复当前页的 is-active 状态
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe || !deckHtml) return;
+
+    const handleLoad = () => {
+      try {
+        const doc = iframe.contentDocument;
+        if (!doc) return;
+        const slides = doc.querySelectorAll('.slide');
+        const targetIdx = currentPage - 1;
+        slides.forEach((s, i) => {
+          s.classList.toggle('is-active', i === targetIdx);
+          s.classList.toggle('is-prev', i < targetIdx);
+        });
+      } catch {
+        // cross-origin, ignore
+      }
+    };
+
+    iframe.addEventListener('load', handleLoad);
+    return () => iframe.removeEventListener('load', handleLoad);
+  }, [deckHtml, currentPage]);
+
   // 从 HTML 中估算页数
   useEffect(() => {
     if (deckHtml) {
@@ -42,11 +65,28 @@ export function PreviewPanel({ deckHtml, generating, selectedTheme }: PreviewPan
     }
   }, [deckHtml]);
 
-  // 翻页
+  // 翻页 — 直接操作 iframe 内 DOM 切换 is-active class
   const gotoPage = (idx: number) => {
     const clamped = Math.max(0, Math.min(idx, totalPages - 1));
     setCurrentPage(clamped + 1);
-    iframeRef.current?.contentWindow?.postMessage({ type: 'preview-goto', idx: clamped }, '*');
+    try {
+      const doc = iframeRef.current?.contentDocument;
+      if (!doc) return;
+      const slides = doc.querySelectorAll('.slide');
+      slides.forEach((s, i) => {
+        s.classList.toggle('is-active', i === clamped);
+        s.classList.toggle('is-prev', i < clamped);
+      });
+      // 更新页码元素
+      const numEl = doc.querySelector('.slide-number');
+      if (numEl) {
+        numEl.setAttribute('data-current', String(clamped + 1));
+        numEl.setAttribute('data-total', String(totalPages));
+      }
+    } catch {
+      // cross-origin fallback: postMessage
+      iframeRef.current?.contentWindow?.postMessage({ type: 'preview-goto', idx: clamped }, '*');
+    }
   };
 
   // 导出 HTML
@@ -77,7 +117,6 @@ export function PreviewPanel({ deckHtml, generating, selectedTheme }: PreviewPan
       <div className="px-5 py-3 border-b border-[var(--color-border)] flex items-center justify-between">
         <span className="text-[13px] font-semibold text-[var(--color-text-dim)]">幻灯片预览</span>
         <div className="flex gap-2">
-          <span className="text-[11px] text-[var(--color-text-dim)]">{selectedTheme} 主题</span>
           {totalPages > 0 && <span className="text-[11px] text-[var(--color-text-dim)]">{totalPages} 页</span>}
         </div>
       </div>
