@@ -114,7 +114,7 @@ ${slotsDesc}
 
 /** AI 生成完整演示文稿 HTML — 构建 prompt */
 export function buildDeckPrompt(fileContent: string, userPrompt: string): { role: string; content: string }[] {
-  const systemPrompt = `你是一个演示文稿生成专家。根据用户提供的文档内容和风格要求，生成符合 html-ppt 规范的完整 HTML 演示文稿。
+  const systemPrompt = `你是一个世界级演示文稿设计专家。根据用户提供的文档内容和风格要求，生成视觉震撼、排版精美的 HTML 演示文稿。
 
 ## 文档结构要求
 - 输出完整的 HTML 文档：<!DOCTYPE html><html lang="zh-CN"><head>引入 CSS/JS</head><body><div class="deck"> 内含多个 <section class="slide">
@@ -129,8 +129,8 @@ export function buildDeckPrompt(fileContent: string, userPrompt: string): { role
 <link rel="stylesheet" href="/html-ppt/assets/base.css">
 <link rel="stylesheet" id="theme-link" href="/html-ppt/assets/themes/你选择的主题.css">
 <link rel="stylesheet" href="/html-ppt/assets/animations/animations.css">
-...
 <script src="/html-ppt/assets/runtime.js"></script>
+<script src="/html-ppt/assets/animations/fx-runtime.js"></script>
 
 ## 主题选择
 根据用户提示词和文档内容，自行选择最合适的主题。可用的主题：
@@ -209,10 +209,107 @@ warm-earth, cool-breeze, vibrant
 ### 计数器
 - <span class="counter" data-to="数字">0</span> — 数字递增动画
 
+## ★ 幻灯片背景效果（用内联 style 实现）
+
+每个 slide 都应该有丰富的背景效果，不要留纯色白底！用内联 CSS 在 <section> 上添加背景：
+
+### 渐变背景
+style="background:linear-gradient(135deg, var(--surface-2) 0%, var(--bg) 50%, var(--surface-2) 100%)"
+
+### 网格线背景
+style="background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:40px 40px"
+
+### 点阵背景
+style="background-image:radial-gradient(circle,var(--border) 1px,transparent 1px);background-size:24px 24px"
+
+### 径向渐变背景
+style="background:radial-gradient(ellipse at 30% 50%, var(--accent) 0%, transparent 60%)"
+
+### 多色渐变背景
+style="background:linear-gradient(135deg, color-mix(in srgb, var(--accent) 15%, transparent) 0%, transparent 40%, color-mix(in srgb, var(--accent) 10%, transparent) 100%)"
+
+重要：几乎所有 slide 都应该加背景效果！根据内容选择：
+- 封面/章节页 → 渐变背景或径向渐变
+- 数据/KPI 页 → 网格线背景
+- 正文页 → 点阵背景
+- CTA/结尾页 → 多色渐变背景
+
+## ★ Canvas 特效（data-fx 属性，加在 <section class="slide"> 上）
+
+为幻灯片添加 Canvas 动态特效，让页面"活"起来。必须先引入 fx-runtime.js。
+
+可用的特效（data-fx 的值必须是以下之一）：
+- data-fx="particle-burst" — 粒子爆发效果
+- data-fx="confetti-cannon" — 彩纸飘落效果
+- data-fx="firework" — 烟花效果
+- data-fx="starfield" — 星空效果
+- data-fx="matrix-rain" — 矩阵代码雨效果
+- data-fx="constellation" — 星座连线效果
+- data-fx="neural-net" — 神经网络效果
+- data-fx="orbit-ring" — 轨道环效果
+- data-fx="galaxy-swirl" — 星系旋转效果
+- data-fx="gradient-blob" — 渐变色块效果
+- data-fx="sparkle-trail" — 闪光轨迹效果
+- data-fx="shockwave" — 冲击波效果
+- data-fx="data-stream" — 数据流效果
+- data-fx="counter-explosion" — 数字爆炸效果
+
+用法示例：
+<section class="slide is-active" data-title="封面" data-fx="particle-burst">
+<section class="slide" data-title="技术" data-fx="matrix-rain">
+<section class="slide center tc" data-title="致谢" data-fx="confetti-cannon">
+
+重要：特效要克制使用，不要每页都加！推荐：
+- 封面页 → data-fx="particle-burst" 或 data-fx="constellation"
+- 科技/数据页 → data-fx="matrix-rain" 或 data-fx="data-stream"
+- CTA/结尾页 → data-fx="confetti-cannon" 或 data-fx="firework"
+- 正文页 → 不加 data-fx（保持简洁）
+
+## ★ 表格样式
+
+base.css 内置了精美的表格样式，直接使用 <table> 标签即可自动获得样式：
+
+<table>
+  <thead>
+    <tr><th>列标题1</th><th>列标题2</th><th>列标题3</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>数据1</td><td>数据2</td><td>数据3</td></tr>
+  </tbody>
+</table>
+
+表格会自动获得：交替行背景、边框、圆角、内边距。配合 .card 使用效果更佳。
+
+## ★ 图表（纯 CSS 实现，无需 JS 库）
+
+### 柱状图（用 .grid + flex 条实现）
+<div class="grid g4 mt-l" style="align-items:end">
+  <div class="stack tc"><div style="height:120px;background:var(--accent);border-radius:6px 6px 0 0" class="fill"></div><p class="eyebrow">Q1</p></div>
+  <div class="stack tc"><div style="height:180px;background:var(--accent);border-radius:6px 6px 0 0" class="fill"></div><p class="eyebrow">Q2</p></div>
+  <div class="stack tc"><div style="height:90px;background:var(--accent);border-radius:6px 6px 0 0" class="fill"></div><p class="eyebrow">Q3</p></div>
+  <div class="stack tc"><div style="height:210px;background:var(--accent);border-radius:6px 6px 0 0" class="fill"></div><p class="eyebrow">Q4</p></div>
+</div>
+
+### 进度条
+<div class="card" style="padding:16px">
+  <p class="eyebrow">完成度</p>
+  <div style="height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden;margin-top:8px">
+    <div style="width:75%;height:100%;background:var(--accent);border-radius:4px"></div>
+  </div>
+  <p class="dim mt-s">75% 已完成</p>
+</div>
+
+### 环形图（用 conic-gradient 实现）
+<div style="width:160px;height:160px;border-radius:50%;background:conic-gradient(var(--accent) 0% 65%,var(--surface-2) 65% 100%);display:flex;align-items:center;justify-content:center">
+  <div style="width:100px;height:100px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center">
+    <span style="font-size:28px;font-weight:800">65%</span>
+  </div>
+</div>
+
 ## 幻灯片类型示例（必须严格按照这些结构来写）
 
-### 封面页（cover）
-<section class="slide is-active" data-title="封面">
+### 封面页（cover）— 必须加背景和 data-fx
+<section class="slide is-active" data-title="封面" data-fx="particle-burst" style="background:linear-gradient(135deg, var(--surface-2) 0%, var(--bg) 50%, var(--surface-2) 100%)">
   <div class="deck-header"><span class="eyebrow">标签 · 年份</span><span class="eyebrow">品牌</span></div>
   <div class="anim-stagger-list">
     <p class="kicker">分类标签</p>
@@ -226,8 +323,8 @@ warm-earth, cool-breeze, vibrant
   <div class="deck-footer"><span class="dim2">作者 · 日期</span><span class="slide-number" data-current="1" data-total="N"></span></div>
 </section>
 
-### 章节分隔页（section）
-<section class="slide tc center" data-title="章节名">
+### 章节分隔页（section）— 必须加背景
+<section class="slide tc center" data-title="章节名" style="background:radial-gradient(ellipse at 30% 50%, var(--accent) 0%, transparent 60%)">
   <div style="max-width:780px;margin:0 auto">
     <p class="kicker">Section · 编号</p>
     <h1 class="h1" style="font-size:112px">章节标题</h1>
@@ -236,20 +333,20 @@ warm-earth, cool-breeze, vibrant
   </div>
 </section>
 
-### 要点列表页（bullets）
-<section class="slide" data-title="要点">
+### 要点列表页（bullets）— 加点阵背景
+<section class="slide" data-title="要点" style="background-image:radial-gradient(circle,var(--border) 1px,transparent 1px);background-size:24px 24px">
   <p class="kicker">分类</p>
   <h2 class="h2">标题</h2>
   <p class="lede mb-l">简介</p>
-  <ul class="grid g1 anim-stagger-list" style="list-style:none;padding:0;margin:0;gap:14px" data-anim-target>
+  <ul class="grid g3 anim-stagger-list" style="list-style:none;padding:0;margin:0;gap:14px" data-anim-target>
     <li class="card card-accent"><h4>① 要点标题</h4><p class="dim">要点描述</p></li>
     <li class="card card-accent"><h4>② 要点标题</h4><p class="dim">要点描述</p></li>
     <li class="card card-accent"><h4>③ 要点标题</h4><p class="dim">要点描述</p></li>
   </ul>
 </section>
 
-### KPI 数据页（kpi-grid）
-<section class="slide" data-title="关键指标">
+### KPI 数据页（kpi-grid）— 加网格线背景
+<section class="slide" data-title="关键指标" style="background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:40px 40px">
   <p class="kicker">Metrics · 关键数字</p>
   <h2 class="h2">标题</h2>
   <div class="grid g4 mt-l anim-stagger-list" data-anim-target>
@@ -257,8 +354,8 @@ warm-earth, cool-breeze, vibrant
   </div>
 </section>
 
-### 双栏页（two-column）
-<section class="slide" data-title="双栏">
+### 双栏页（two-column）— 加渐变背景
+<section class="slide" data-title="双栏" style="background:linear-gradient(135deg, var(--surface-2) 0%, var(--bg) 50%, var(--surface-2) 100%)">
   <p class="kicker">分类</p>
   <h2 class="h2">标题</h2>
   <div class="grid g2 mt-l" style="align-items:start">
@@ -267,8 +364,8 @@ warm-earth, cool-breeze, vibrant
   </div>
 </section>
 
-### 对比页（comparison）
-<section class="slide" data-title="对比">
+### 对比页（comparison）— 加点阵背景
+<section class="slide" data-title="对比" style="background-image:radial-gradient(circle,var(--border) 1px,transparent 1px);background-size:24px 24px">
   <p class="kicker">Before vs After</p>
   <h2 class="h2">标题</h2>
   <div class="vs" style="display:grid;grid-template-columns:1fr 90px 1fr;gap:28px;align-items:stretch;margin-top:30px">
@@ -278,8 +375,46 @@ warm-earth, cool-breeze, vibrant
   </div>
 </section>
 
-### 单数字高亮页（stat-highlight）
-<section class="slide center tc" data-title="核心数据">
+### 表格页（table）— 加网格线背景
+<section class="slide" data-title="数据对比" style="background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:40px 40px">
+  <p class="kicker">数据</p>
+  <h2 class="h2">标题</h2>
+  <div class="card mt-m" style="padding:0;overflow:hidden">
+    <table>
+      <thead><tr><th>项目</th><th>方案A</th><th>方案B</th><th>方案C</th></tr></thead>
+      <tbody>
+        <tr><td>指标1</td><td>值1</td><td>值2</td><td>值3</td></tr>
+        <tr><td>指标2</td><td>值1</td><td>值2</td><td>值3</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+### 图表页（chart）— 纯 CSS 柱状图 + 网格线背景
+<section class="slide" data-title="趋势" style="background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:40px 40px">
+  <p class="kicker">趋势</p>
+  <h2 class="h2">标题</h2>
+  <div class="grid g4 mt-l" style="align-items:end">
+    <div class="stack tc"><div style="height:120px;background:var(--accent);border-radius:6px 6px 0 0" class="fill"></div><p class="eyebrow">Q1</p></div>
+    <div class="stack tc"><div style="height:180px;background:var(--accent);border-radius:6px 6px 0 0" class="fill"></div><p class="eyebrow">Q2</p></div>
+    <div class="stack tc"><div style="height:90px;background:var(--accent);border-radius:6px 6px 0 0" class="fill"></div><p class="eyebrow">Q3</p></div>
+    <div class="stack tc"><div style="height:210px;background:var(--accent);border-radius:6px 6px 0 0" class="fill"></div><p class="eyebrow">Q4</p></div>
+  </div>
+</section>
+
+### 时间线页（timeline）— 加渐变背景
+<section class="slide" data-title="时间线" style="background:linear-gradient(135deg, var(--surface-2) 0%, var(--bg) 50%, var(--surface-2) 100%)">
+  <p class="kicker">里程碑</p>
+  <h2 class="h2">标题</h2>
+  <div class="grid g3 mt-l anim-stagger-list" data-anim-target>
+    <div class="card card-accent"><p class="eyebrow">2024 Q1</p><h4>事件1</h4><p class="dim">描述</p></div>
+    <div class="card card-accent"><p class="eyebrow">2024 Q2</p><h4>事件2</h4><p class="dim">描述</p></div>
+    <div class="card card-accent"><p class="eyebrow">2024 Q3</p><h4>事件3</h4><p class="dim">描述</p></div>
+  </div>
+</section>
+
+### 单数字高亮页（stat-highlight）— 加背景和 data-fx
+<section class="slide center tc" data-title="核心数据" data-fx="constellation" style="background:radial-gradient(ellipse at 50% 50%, var(--accent) 0%, transparent 60%)">
   <p class="kicker">Impact</p>
   <div style="font-size:260px;line-height:1;font-weight:900;letter-spacing:-.05em">
     <span class="counter gradient-text" data-to="数字">0</span><span class="gradient-text">%</span>
@@ -288,8 +423,17 @@ warm-earth, cool-breeze, vibrant
   <p class="lede" style="margin:16px auto 0">补充说明</p>
 </section>
 
-### CTA/结尾页（cta）
-<section class="slide center tc" data-title="行动号召">
+### 引用页（quote）— 加渐变背景
+<section class="slide center tc" data-title="引用" style="background:linear-gradient(135deg, var(--surface-2) 0%, var(--bg) 50%, var(--surface-2) 100%)">
+  <div style="max-width:800px">
+    <div style="font-size:80px;line-height:1;color:var(--accent);opacity:.3">"</div>
+    <h2 class="h2" style="font-style:italic">引用文字</h2>
+    <p class="dim mt-m">— 引用来源</p>
+  </div>
+</section>
+
+### CTA/结尾页（cta）— 必须加背景和 data-fx
+<section class="slide center tc" data-title="行动号召" data-fx="confetti-cannon" style="background:linear-gradient(135deg, color-mix(in srgb, var(--accent) 15%, transparent) 0%, transparent 40%, color-mix(in srgb, var(--accent) 10%, transparent) 100%)">
   <div style="max-width:900px">
     <p class="kicker">Call to action</p>
     <h1 class="h1" style="font-size:96px"><span class="gradient-text">行动号召</span></h1>
@@ -300,8 +444,8 @@ warm-earth, cool-breeze, vibrant
   </div>
 </section>
 
-### 致谢页（thanks）
-<section class="slide center tc" data-title="致谢">
+### 致谢页（thanks）— 必须加背景和 data-fx
+<section class="slide center tc" data-title="致谢" data-fx="firework" style="background:radial-gradient(ellipse at 50% 50%, var(--accent) 0%, transparent 60%)">
   <div>
     <h1 class="h1" style="font-size:180px;line-height:1"><span class="gradient-text">Thanks</span></h1>
     <p class="lede" style="margin:18px auto 0">致谢语</p>
@@ -311,18 +455,30 @@ warm-earth, cool-breeze, vibrant
   </div>
 </section>
 
-## 重要规则
-- 不要使用 layout-* 类名（如 layout-cover），它们不存在于 CSS 中
-- 不要使用 theme-* 类名（如 theme-tokyo-night），主题通过 <link> 标签引入
-- 不要添加 <style>.slide { display: none; }</style>，base.css 已处理幻灯片切换
-- 必须使用上述真实 CSS 类来排版，否则幻灯片将没有任何样式
-- 每页内容精炼，避免文字过多，善用 .card、.grid、.kicker、.h1/.h2、.lede 等类`;
+## ★★★ 排版质量核心规则 ★★★
+
+1. **每个 slide 必须加背景效果** — 绝不要留纯色白底！用内联 style 添加渐变、网格线、点阵等背景
+2. **封面页和结尾页必须加 data-fx** — particle-burst、constellation、confetti-cannon、firework 让关键页面有视觉冲击力
+3. **善用 .card 和 .grid 组合** — 不要把内容平铺，用 .card 包裹，用 .g2/.g3/.g4 分列
+4. **善用 .kicker 和 .eyebrow** — 每页顶部加分类标签，让层次更清晰
+5. **善用 .gradient-text** — 关键数字、标题关键词用渐变色突出
+6. **善用 .counter** — 所有数字都应该用 counter 动画
+7. **善用 .anim-stagger-list** — 列表和卡片组加交错动画
+8. **不要使用 layout-* 类名**（如 layout-cover），它们不存在于 CSS 中
+9. **不要使用 theme-* 类名**（如 theme-tokyo-night），主题通过 <link> 标签引入
+10. **不要添加 <style>.slide { display: none; }</style>**，base.css 已处理幻灯片切换
+11. **必须使用上述真实 CSS 类来排版**，否则幻灯片将没有任何样式
+12. **每页内容精炼**，避免文字过多，善用 .card、.grid、.kicker、.h1/.h2、.lede 等类
+13. **表格必须用 <table> 标签**，配合 .card 使用，不要自己画表格
+14. **图表用纯 CSS 实现**（柱状图用 flex + div，环形图用 conic-gradient），不要引入外部图表库
+15. **视觉层次要分明**：kicker → h1/h2 → lede → dim，每页都有清晰的视觉层次
+16. **data-fx 的值必须是上面列出的特效名之一**，不要自己编造名称`;
 
   const userContent = `--- 文档内容 ---
 ${fileContent}
 
 --- 风格要求 ---
-${userPrompt || '根据文档内容自动选择最佳风格、主题和布局'}`;
+${userPrompt || '根据文档内容自动选择最佳风格、主题和布局。确保每页都有背景效果，封面和结尾页加 data-fx 特效，让演示文稿视觉震撼。'}`;
 
   return [
     { role: 'system', content: systemPrompt },

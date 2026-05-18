@@ -106,11 +106,7 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
     navigate('/editor');
   };
 
-  // 生成进度百分比
-  const progressPercent = generating && totalPages > 0
-    ? Math.min(100, Math.round((currentPage / Math.max(totalPages, 7)) * 100))
-    : generating ? 30 : 100;
-
+  
   return (
     <div className="w-[55%] flex flex-col bg-[#111118]">
       {/* 顶部信息 */}
@@ -123,7 +119,20 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
 
       {/* iframe 预览区 */}
       <div ref={containerRef} className="flex-1 flex items-center justify-center p-5 relative overflow-hidden">
-        {deckHtml ? (
+        {generating ? (
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative w-16 h-16">
+              <div className="absolute inset-0 rounded-full border-2 border-[var(--color-border)]" />
+              <div
+                className="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--color-primary)] animate-spin"
+              />
+            </div>
+            <div className="text-[var(--color-text-dim)] text-sm">AI 正在生成幻灯片...</div>
+            <div className="w-48 h-1 bg-[var(--color-surface-2)] rounded-full overflow-hidden">
+              <div className="h-full rounded-full animate-pulse" style={{ width: '60%', background: 'linear-gradient(90deg, #3b6cff, #7a5cff)' }} />
+            </div>
+          </div>
+        ) : deckHtml ? (
           <div
             className="relative"
             style={{
@@ -144,22 +153,10 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
               title="幻灯片预览"
               sandbox="allow-scripts allow-same-origin"
             />
-            {/* 生成进度条 */}
-            {generating && (
-              <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-[var(--color-surface-2)]">
-                <div
-                  className="h-full rounded-r-sm"
-                  style={{
-                    width: `${progressPercent}%`,
-                    background: 'linear-gradient(90deg, #3b6cff, #4ade80)',
-                  }}
-                />
-              </div>
-            )}
           </div>
         ) : (
           <div className="text-[var(--color-text-dim2)] text-xs">
-            {generating ? 'AI 正在生成...' : '上传文件并发送提示词，预览将在此显示'}
+            上传文件并发送提示词，预览将在此显示
           </div>
         )}
       </div>

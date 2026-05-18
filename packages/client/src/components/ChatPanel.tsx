@@ -94,7 +94,7 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
     await streamAI(aiMessages, {
       onChunk: (text) => {
         accumulatedHtml += text;
-        onHtmlUpdate(accumulatedHtml);
+        // 流式生成期间不实时更新预览，避免 iframe 频闪
       },
       onDone: () => {
         setGenerating(false);
@@ -111,6 +111,7 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
         }
         cleanHtml = cleanHtml.trim();
 
+        // 生成完成后一次性更新预览
         onHtmlUpdate(cleanHtml);
 
         // 更新 AI 消息为完成状态
@@ -133,7 +134,7 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && e.altKey) {
       e.preventDefault();
       handleSend();
     }
@@ -214,7 +215,7 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
           </button>
         </div>
         <div className="text-center mt-1.5 text-[10px] text-[var(--color-text-dim2)]">
-          提示词可选，不填则 AI 根据文件内容自动决定风格
+          提示词可选，不填则 AI 根据文件内容自动决定风格。Alt+Enter 发送
         </div>
       </div>
     </div>
