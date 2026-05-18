@@ -98,8 +98,10 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
       },
       onDone: () => {
         setGenerating(false);
-        // 提取 HTML（去掉可能的 markdown 代码围栏）
+        // 提取 HTML — 去掉可能的 markdown 代码围栏和 AI 在 HTML 前输出的非 HTML 文本
         let cleanHtml = accumulatedHtml.trim();
+
+        // 去掉 markdown 代码围栏
         if (cleanHtml.startsWith('```html')) {
           cleanHtml = cleanHtml.slice(7);
         }
@@ -108,6 +110,18 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
         }
         if (cleanHtml.endsWith('```')) {
           cleanHtml = cleanHtml.slice(0, -3);
+        }
+        cleanHtml = cleanHtml.trim();
+
+        // 如果 AI 在 HTML 前面输出了规划文本等非 HTML 内容，只保留 <!DOCTYPE html> 及之后的部分
+        const htmlStartIdx = cleanHtml.indexOf('<!DOCTYPE html');
+        if (htmlStartIdx > 0) {
+          cleanHtml = cleanHtml.slice(htmlStartIdx);
+        }
+        // 如果没有 <!DOCTYPE html 但有 <html，也尝试提取
+        const htmlAltIdx = cleanHtml.indexOf('<html');
+        if (htmlAltIdx > 0 && htmlStartIdx < 0) {
+          cleanHtml = cleanHtml.slice(htmlAltIdx);
         }
         cleanHtml = cleanHtml.trim();
 

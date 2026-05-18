@@ -16,9 +16,10 @@ app.post('/api/ai/chat', async (c) => {
     apiKey: string;
     model: string;
     messages: { role: string; content: string }[];
+    maxTokens?: number;
   }>();
 
-  const { provider, baseUrl, apiKey, model, messages } = body;
+  const { provider, baseUrl, apiKey, model, messages, maxTokens } = body;
 
   if (!apiKey) {
     return c.json({ error: 'API Key 未配置' }, 400);
@@ -35,7 +36,7 @@ app.post('/api/ai/chat', async (c) => {
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01',
         },
-        body: JSON.stringify({ model, messages, max_tokens: 4096 }),
+        body: JSON.stringify({ model, messages, max_tokens: maxTokens || 16384 }),
       });
       if (!res.ok) {
         const err = await res.text();
@@ -52,7 +53,7 @@ app.post('/api/ai/chat', async (c) => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({ model, messages, temperature: 0.7 }),
+        body: JSON.stringify({ model, messages, temperature: 0.7, max_tokens: maxTokens || 16384 }),
       });
       if (!res.ok) {
         const err = await res.text();
@@ -74,9 +75,10 @@ app.post('/api/ai/chat/stream', async (c) => {
     apiKey: string;
     model: string;
     messages: { role: string; content: string }[];
+    maxTokens?: number;
   }>();
 
-  const { provider, baseUrl, apiKey, model, messages } = body;
+  const { provider, baseUrl, apiKey, model, messages, maxTokens } = body;
 
   if (!apiKey) {
     return c.json({ error: 'API Key 未配置' }, 400);
@@ -92,7 +94,7 @@ app.post('/api/ai/chat/stream', async (c) => {
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01',
         },
-        body: JSON.stringify({ model, messages, max_tokens: 8192, stream: true }),
+        body: JSON.stringify({ model, messages, max_tokens: maxTokens || 16384, stream: true }),
       });
       if (!res.ok) {
         const err = await res.text();
@@ -114,7 +116,7 @@ app.post('/api/ai/chat/stream', async (c) => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({ model, messages, temperature: 0.7, stream: true }),
+        body: JSON.stringify({ model, messages, temperature: 0.7, max_tokens: maxTokens || 16384, stream: true }),
       });
       if (!res.ok) {
         const err = await res.text();

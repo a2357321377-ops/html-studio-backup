@@ -20,7 +20,7 @@ export async function streamAI(
     const res = await fetch('/api/ai/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider, baseUrl, apiKey, model, messages }),
+      body: JSON.stringify({ provider, baseUrl, apiKey, model, messages, maxTokens: 16384 }),
     });
 
     if (!res.ok) {
