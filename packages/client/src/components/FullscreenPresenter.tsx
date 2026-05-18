@@ -59,7 +59,7 @@ export function FullscreenPresenter({ deckHtml, totalPages, onClose }: Fullscree
     controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
   }, []);
 
-  // iframe 加载后设置第一页为 active
+  // iframe 加载后：设置第一页为 active + 绑定 iframe 内 ESC 监听
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe || !deckHtml) return;
@@ -73,6 +73,14 @@ export function FullscreenPresenter({ deckHtml, totalPages, onClose }: Fullscree
           s.classList.toggle('is-active', i === 0);
           s.classList.toggle('is-prev', i < 0);
         });
+        // iframe 内 ESC 键 → postMessage 通知外层退出
+        doc.addEventListener('keydown', (e: KeyboardEvent) => {
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            window.postMessage({ type: 'fullscreen-esc' }, '*');
+          }
+        });
       } catch {
         // cross-origin
       }
@@ -81,6 +89,17 @@ export function FullscreenPresenter({ deckHtml, totalPages, onClose }: Fullscree
     iframe.addEventListener('load', handleLoad);
     return () => iframe.removeEventListener('load', handleLoad);
   }, [deckHtml]);
+
+  // 监听 iframe 内通过 postMessage 发来的 ESC 事件
+  useEffect(() => {
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'fullscreen-esc') {
+        onClose();
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [onClose]);
 
   // 阻止 body 滚动
   useEffect(() => {
