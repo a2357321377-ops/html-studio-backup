@@ -40,6 +40,10 @@ interface AIChatState {
   setDeckHtml: (html: string) => void;
   clearDeckHtml: () => void;
 
+  // 原始提示词（首次生成时记录，编辑时作为上下文）
+  originalPrompt: string;
+  setOriginalPrompt: (prompt: string) => void;
+
   // 重置所有状态
   resetAll: () => void;
 }
@@ -61,16 +65,26 @@ export const useAIChat = create<AIChatState>()(
       generating: false,
       setGenerating: (g) => set({ generating: g }),
 
+      generationProgress: 0,
+      generationPhase: '',
+      setGenerationProgress: (progress, phase) => set({ generationProgress: progress, generationPhase: phase }),
+
       deckHtml: '',
       setDeckHtml: (html) => set({ deckHtml: html }),
       clearDeckHtml: () => set({ deckHtml: '' }),
+
+      originalPrompt: '',
+      setOriginalPrompt: (prompt) => set({ originalPrompt: prompt }),
 
       resetAll: () =>
         set({
           messages: [],
           uploadedFile: null,
           generating: false,
+          generationProgress: 0,
+          generationPhase: '',
           deckHtml: '',
+          originalPrompt: '',
         }),
     }),
     { name: 'html-studio-ai-chat' }

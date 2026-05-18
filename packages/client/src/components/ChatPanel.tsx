@@ -4,7 +4,7 @@ import { ChatMessage } from './ChatMessage';
 import { useFileParser } from '../hooks/useFileParser';
 import { useAIConfig } from '../hooks/useAIConfig';
 import { useAIChat } from '../hooks/useAIChat';
-import { buildDeckPrompt } from '../lib/ai-client';
+import { buildDeckPrompt, buildEditPrompt } from '../lib/ai-client';
 import { streamAI } from '../lib/ai-stream';
 
 interface ChatPanelProps {
@@ -24,6 +24,8 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
   const setGenerationProgress = useAIChat((s) => s.setGenerationProgress);
   const deckHtml = useAIChat((s) => s.deckHtml);
   const setDeckHtml = useAIChat((s) => s.setDeckHtml);
+  const originalPrompt = useAIChat((s) => s.originalPrompt);
+  const setOriginalPrompt = useAIChat((s) => s.setOriginalPrompt);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { parseResult, parsing, error, parseFile, reset: resetParse } = useFileParser();
@@ -75,9 +77,9 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
     const promptEl = document.querySelector<HTMLTextAreaElement>('#chat-prompt-input');
     const userMsg = promptEl?.value?.trim() || '根据上传的文件生成幻灯片';
 
-    // 从提示词中提取目标页数
-    const pageCountMatch = userMsg.match(/(\d+)\s*页|(\d+)\s*slides|(\d+)\s*pages/i);
-    const requestedPages = pageCountMatch ? parseInt(pageCountMatch[1] || pageCountMatch[2] || pageCountMatch[3]) : null;
+    // 判断是"重新生成"还是"编辑"
+    const isRegenerate = /重新生成|重新制作|从头生成|从零生成|regenerate|start\s*over/i.test(userMsg);
+    const isEditMode = !!deckHtml && !isRegenerate;
 
     // 添加用户消息
     const msgId = `msg-${Date.now()}`;
@@ -87,20 +89,55 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
     setGenerating(true);
     onGenerationStart?.();
 
-    // 构建 AI prompt（不指定主题，让 AI 自行选择）
-    const aiMessages = buildDeckPrompt(fileContent, userMsg);
+    // 构建 AI prompt
+    let aiMessages: Array<{ role: string; content: string }>;
+    let requestedPages: number | null = null;
+
+    if (isEditMode) {
+      // 编辑模式：发送已有 HTML + 修改指令
+      aiMessages = buildEditPrompt(
+        fileContent,
+        originalPrompt,
+        deckHtml,
+        userMsg,
+      );
+    } else {
+      // 生成模式：从零生成
+      aiMessages = buildDeckPrompt(fileContent, userMsg);
+      setOriginalPrompt(userMsg);
+
+      // 从提示词中提取目标页数（仅生成模式）
+      const pageCountMatch = userMsg.match(/(\d+)\s*页|(\d+)\s*slides|(\d+)\s*pages/i);
+      requestedPages = pageCountMatch ? parseInt(pageCountMatch[1] || pageCountMatch[2] || pageCountMatch[3]) : null;
+    }
 
     // 添加 AI 消息占位
     const aiMsgId = `msg-ai-${Date.now()}`;
-    addMessage({ id: aiMsgId, role: 'assistant', content: '正在生成幻灯片...', streaming: true });
+    addMessage({
+      id: aiMsgId,
+      role: 'assistant',
+      content: isEditMode ? '正在修改幻灯片...' : '正在生成幻灯片...',
+      streaming: true,
+    });
 
     let accumulatedHtml = '';
+    const existingSlideCount = isEditMode
+      ? (deckHtml.match(/<section[^>]*class="[^"]*slide[^"]*"/g) || []).length
+      : 0;
 
     await streamAI(aiMessages, {
       onChunk: (text) => {
         accumulatedHtml += text;
 
-        // 分析累积 HTML 推算进度
+        if (isEditMode) {
+          // 编辑模式：简单进度估算（基于已接收文本量 vs 原始 HTML 大小）
+          const ratio = accumulatedHtml.length / Math.max(deckHtml.length, 1);
+          const progress = Math.min(Math.round(ratio * 90), 90);
+          setGenerationProgress(progress, '正在修改幻灯片...');
+          return;
+        }
+
+        // 生成模式：分析累积 HTML 推算进度
         const hasDoctype = accumulatedHtml.includes('<!DOCTYPE html');
         const headClosed = accumulatedHtml.includes('</head>');
         const slidesSoFar = (accumulatedHtml.match(/<section[^>]*class="[^"]*slide[^"]*"/g) || []).length;
@@ -130,7 +167,7 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
       },
       onDone: () => {
         setGenerating(false);
-        setGenerationProgress(100, '生成完成');
+        setGenerationProgress(100, isEditMode ? '修改完成' : '生成完成');
         // 提取 HTML — 去掉可能的 markdown 代码围栏和 AI 在 HTML 前输出的非 HTML 文本
         let cleanHtml = accumulatedHtml.trim();
 
@@ -164,7 +201,9 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
         // 更新 AI 消息为完成状态
         const slideCount = (cleanHtml.match(/<section[^>]*class="[^"]*slide[^"]*"/g) || []).length;
         updateMessage(aiMsgId, {
-          content: `生成完成！共 ${slideCount} 页幻灯片。`,
+          content: isEditMode
+            ? `修改完成！共 ${slideCount} 页幻灯片。`
+            : `生成完成！共 ${slideCount} 页幻灯片。`,
           streaming: false,
         });
 
@@ -249,15 +288,17 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
           <textarea
             id="chat-prompt-input"
             className="flex-1 bg-[var(--color-surface-2)] border border-[var(--color-border)] text-[var(--color-text)] rounded-xl px-3.5 py-2.5 text-[13px] resize-none min-h-[40px] max-h-[100px] placeholder:text-[var(--color-text-dim)] focus:outline-none focus:border-[var(--color-primary)]"
-            placeholder="描述你想要的演示风格，如：做一个深色科技风格的产品发布会..."
+            placeholder={deckHtml
+              ? "输入修改要求，如：修改第3页排版、调整配色、更换主题..."
+              : "描述你想要的演示风格，如：做一个深色科技风格的产品发布会..."
+            }
             onKeyDown={handleKeyDown}
             rows={1}
           />
           <button
             className="w-10 h-10 rounded-xl flex items-center justify-center text-lg text-white shrink-0 disabled:opacity-40"
             style={{ background: 'linear-gradient(135deg, #3b6cff, #7a5cff)' }}
-            disabled={generating || (!uploadedFile && !deckHtml) || (!connected && !apiKey)}
-            onClick={handleSend}
+            disabled={generating || (!uploadedFile && !deckHtml) || (!connected && !apiKey)}            onClick={handleSend}
           >
             ➤
           </button>
