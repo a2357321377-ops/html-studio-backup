@@ -21,6 +21,7 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
   const setUploadedFile = useAIChat((s) => s.setUploadedFile);
   const generating = useAIChat((s) => s.generating);
   const setGenerating = useAIChat((s) => s.setGenerating);
+  const setGenerationProgress = useAIChat((s) => s.setGenerationProgress);
   const deckHtml = useAIChat((s) => s.deckHtml);
   const setDeckHtml = useAIChat((s) => s.setDeckHtml);
 
@@ -74,6 +75,10 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
     const promptEl = document.querySelector<HTMLTextAreaElement>('#chat-prompt-input');
     const userMsg = promptEl?.value?.trim() || '根据上传的文件生成幻灯片';
 
+    // 从提示词中提取目标页数
+    const pageCountMatch = userMsg.match(/(\d+)\s*页|(\d+)\s*slides|(\d+)\s*pages/i);
+    const requestedPages = pageCountMatch ? parseInt(pageCountMatch[1] || pageCountMatch[2] || pageCountMatch[3]) : null;
+
     // 添加用户消息
     const msgId = `msg-${Date.now()}`;
     addMessage({ id: msgId, role: 'user', content: userMsg });
@@ -94,10 +99,38 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
     await streamAI(aiMessages, {
       onChunk: (text) => {
         accumulatedHtml += text;
-        // 流式生成期间不实时更新预览，避免 iframe 频闪
+
+        // 分析累积 HTML 推算进度
+        const hasDoctype = accumulatedHtml.includes('<!DOCTYPE html');
+        const headClosed = accumulatedHtml.includes('</head>');
+        const slidesSoFar = (accumulatedHtml.match(/<section[^>]*class="[^"]*slide[^"]*"/g) || []).length;
+        const htmlClosed = accumulatedHtml.includes('</html>');
+
+        let progress = 0;
+        let phase = '正在连接...';
+
+        if (hasDoctype && !headClosed) {
+          progress = 5;
+          phase = '正在生成 HTML 结构...';
+        } else if (headClosed && slidesSoFar === 0) {
+          progress = 10;
+          phase = '正在准备幻灯片内容...';
+        } else if (slidesSoFar > 0) {
+          const targetPages = requestedPages || 12;
+          const slideProgress = Math.min(slidesSoFar / targetPages, 0.95);
+          progress = 10 + slideProgress * 85;
+          phase = `正在生成第 ${slidesSoFar}/${targetPages} 页...`;
+        }
+        if (htmlClosed) {
+          progress = 95;
+          phase = '正在完成...';
+        }
+
+        setGenerationProgress(progress, phase);
       },
       onDone: () => {
         setGenerating(false);
+        setGenerationProgress(100, '生成完成');
         // 提取 HTML — 去掉可能的 markdown 代码围栏和 AI 在 HTML 前输出的非 HTML 文本
         let cleanHtml = accumulatedHtml.trim();
 
@@ -139,6 +172,7 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
       },
       onError: (err) => {
         setGenerating(false);
+        setGenerationProgress(0, '');
         updateMessage(aiMsgId, {
           content: `生成失败：${err}`,
           streaming: false,

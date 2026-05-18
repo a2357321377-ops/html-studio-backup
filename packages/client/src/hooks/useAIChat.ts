@@ -30,6 +30,11 @@ interface AIChatState {
   generating: boolean;
   setGenerating: (g: boolean) => void;
 
+  // 生成进度
+  generationProgress: number;
+  generationPhase: string;
+  setGenerationProgress: (progress: number, phase: string) => void;
+
   // AI 生成的 HTML
   deckHtml: string;
   setDeckHtml: (html: string) => void;

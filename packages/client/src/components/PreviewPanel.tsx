@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FullscreenPresenter } from './FullscreenPresenter';
+import { useAIChat } from '../hooks/useAIChat';
 
 interface PreviewPanelProps {
   deckHtml: string;
@@ -14,6 +15,8 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);
+  const generationProgress = useAIChat((s) => s.generationProgress);
+  const generationPhase = useAIChat((s) => s.generationPhase);
   const navigate = useNavigate();
 
   // 计算 iframe 缩放
@@ -129,10 +132,14 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
                 className="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--color-primary)] animate-spin"
               />
             </div>
-            <div className="text-[var(--color-text-dim)] text-sm">AI 正在生成幻灯片...</div>
-            <div className="w-48 h-1 bg-[var(--color-surface-2)] rounded-full overflow-hidden">
-              <div className="h-full rounded-full animate-pulse" style={{ width: '60%', background: 'linear-gradient(90deg, #3b6cff, #7a5cff)' }} />
+            <div className="text-[var(--color-text-dim)] text-sm">{generationPhase || 'AI 正在生成幻灯片...'}</div>
+            <div className="w-48 h-1.5 bg-[var(--color-surface-2)] rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{ width: `${generationProgress}%`, background: 'linear-gradient(90deg, #3b6cff, #7a5cff)' }}
+              />
             </div>
+            <div className="text-[var(--color-text-dim2)] text-[10px]">{generationProgress}%</div>
           </div>
         ) : deckHtml ? (
           <div
