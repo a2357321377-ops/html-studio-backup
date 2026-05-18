@@ -62,8 +62,12 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
   };
 
   const handleSend = async () => {
-    if (!uploadedFile && !deckHtml) return;
+    // 获取用户输入的提示词
+    const promptEl = document.querySelector<HTMLTextAreaElement>('#chat-prompt-input');
+    const userMsg = promptEl?.value?.trim() || (uploadedFile ? '根据上传的文件生成幻灯片' : '');
+
     if (generating) return;
+    if (!userMsg && !uploadedFile && !deckHtml) return;
 
     // 获取文件内容（从 store 中读取已解析的内容）
     let fileContent = uploadedFile?.content || '';
@@ -72,10 +76,6 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
         `--- 第${i + 1}页 ---\n${s.slots.map(slot => `${slot.label || slot.id}: ${slot.value}`).join('\n')}`
       ).join('\n\n');
     }
-
-    // 获取用户输入的提示词
-    const promptEl = document.querySelector<HTMLTextAreaElement>('#chat-prompt-input');
-    const userMsg = promptEl?.value?.trim() || '根据上传的文件生成幻灯片';
 
     // 判断是"重新生成"还是"编辑"
     const isRegenerate = /重新生成|重新制作|从头生成|从零生成|regenerate|start\s*over/i.test(userMsg);
@@ -261,7 +261,7 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
       <div className="flex-1 overflow-y-auto px-5 py-4">
         {messages.length === 0 && (
           <div className="text-center text-[var(--color-text-dim2)] text-xs mt-8">
-            上传文件并输入提示词，AI 将为你生成幻灯片
+            上传文件或直接输入提示词，AI 将为你生成幻灯片
           </div>
         )}
         {messages.map((msg) => (
@@ -298,13 +298,13 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
           <button
             className="w-10 h-10 rounded-xl flex items-center justify-center text-lg text-white shrink-0 disabled:opacity-40"
             style={{ background: 'linear-gradient(135deg, #3b6cff, #7a5cff)' }}
-            disabled={generating || (!uploadedFile && !deckHtml) || (!connected && !apiKey)}            onClick={handleSend}
+            disabled={generating || (!connected && !apiKey)}            onClick={handleSend}
           >
             ➤
           </button>
         </div>
         <div className="text-center mt-1.5 text-[10px] text-[var(--color-text-dim2)]">
-          提示词可选，不填则 AI 根据文件内容自动决定风格。Alt+Enter 发送
+          提示词可选，不填则 AI 根据文件内容自动决定风格；无文件时请输入提示词。Alt+Enter 发送
         </div>
       </div>
     </div>
