@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FullscreenPresenter } from './FullscreenPresenter';
 
 interface PreviewPanelProps {
   deckHtml: string;
@@ -12,6 +13,7 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1);
+  const [fullscreen, setFullscreen] = useState(false);
   const navigate = useNavigate();
 
   // 计算 iframe 缩放
@@ -191,6 +193,13 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
             导出 HTML
           </button>
           <button
+            className="px-4 py-2 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)] text-xs text-[var(--color-text-dim)] hover:text-[var(--color-text)] disabled:opacity-40"
+            disabled={!deckHtml || generating}
+            onClick={() => setFullscreen(true)}
+          >
+            全屏演讲
+          </button>
+          <button
             className="px-4 py-2 rounded-lg text-xs text-white font-semibold disabled:opacity-40"
             style={{ background: 'linear-gradient(135deg, #3b6cff, #7a5cff)' }}
             disabled={!deckHtml || generating}
@@ -200,6 +209,15 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
           </button>
         </div>
       </div>
+
+      {/* 全屏演讲模式 */}
+      {fullscreen && deckHtml && (
+        <FullscreenPresenter
+          deckHtml={deckHtml}
+          totalPages={totalPages}
+          onClose={() => setFullscreen(false)}
+        />
+      )}
     </div>
   );
 }
