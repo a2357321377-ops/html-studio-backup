@@ -62,7 +62,7 @@ export function LayoutTab() {
             if (slot.tagName === 'IMG') {
               (slot as HTMLImageElement).src = content.images[imgIdx];
             } else {
-              slot.style.backgroundImage = `url(${content.images[imgIdx]})`;
+              (slot as HTMLElement).style.backgroundImage = `url(${content.images[imgIdx]})`;
             }
             imgIdx++;
           }
