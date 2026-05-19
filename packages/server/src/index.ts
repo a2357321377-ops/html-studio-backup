@@ -27,7 +27,9 @@ app.post('/api/ai/chat', async (c) => {
 
   try {
     if (provider === 'anthropic') {
-      // Anthropic Claude API
+      // Anthropic Claude API — 不支持 messages 中的 role: 'system'，需提取为顶层参数
+      const systemMessage = messages.find(m => m.role === 'system');
+      const chatMessages = messages.filter(m => m.role !== 'system');
       const url = `${baseUrl}/v1/messages`;
       const res = await fetch(url, {
         method: 'POST',
@@ -36,7 +38,12 @@ app.post('/api/ai/chat', async (c) => {
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01',
         },
-        body: JSON.stringify({ model, messages, max_tokens: maxTokens || 16384 }),
+        body: JSON.stringify({
+          model,
+          system: systemMessage?.content || '',
+          messages: chatMessages,
+          max_tokens: maxTokens || 16384,
+        }),
       });
       if (!res.ok) {
         const err = await res.text();
@@ -86,6 +93,9 @@ app.post('/api/ai/chat/stream', async (c) => {
 
   try {
     if (provider === 'anthropic') {
+      // Anthropic Claude API — 不支持 messages 中的 role: 'system'，需提取为顶层参数
+      const systemMessage = messages.find(m => m.role === 'system');
+      const chatMessages = messages.filter(m => m.role !== 'system');
       const url = `${baseUrl}/v1/messages`;
       const res = await fetch(url, {
         method: 'POST',
@@ -94,7 +104,13 @@ app.post('/api/ai/chat/stream', async (c) => {
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01',
         },
-        body: JSON.stringify({ model, messages, max_tokens: maxTokens || 16384, stream: true }),
+        body: JSON.stringify({
+          model,
+          system: systemMessage?.content || '',
+          messages: chatMessages,
+          max_tokens: maxTokens || 16384,
+          stream: true,
+        }),
       });
       if (!res.ok) {
         const err = await res.text();
