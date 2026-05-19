@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { useEditorStore } from '../../hooks/useEditorStore';
+import { ImageUploader } from './ImageUploader';
 
 /**
  * 左侧幻灯片缩略图列表
@@ -131,14 +132,15 @@ export function SlideThumbnailList() {
         ))}
       </div>
 
-      {/* 添加页按钮 */}
-      <div className="p-2 border-t border-[var(--color-border)]">
+      {/* 添加页 + 添加图片按钮 */}
+      <div className="p-2 border-t border-[var(--color-border)] space-y-1.5">
         <button
           className="w-full py-1.5 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)] text-[11px] text-[var(--color-text-dim)] hover:text-[var(--color-text)] transition-colors"
           onClick={handleAddSlide}
         >
           + 添加幻灯片
         </button>
+        <ImageUploader />
       </div>
     </div>
   );

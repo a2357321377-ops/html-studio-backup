@@ -76,7 +76,7 @@ export function LayoutTab() {
 
       // 替换 iframe 中当前 slide
       const iframeDoc = iframeRef?.contentDocument;
-      if (!iframeDoc) return;
+      if (!iframeDoc) return;;
       const currentSlides = iframeDoc.querySelectorAll('.slide');
       const currentSlide = currentSlides[currentSlideIndex];
       if (!currentSlide) return;
