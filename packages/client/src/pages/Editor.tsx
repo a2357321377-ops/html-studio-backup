@@ -1,54 +1,93 @@
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDeck } from '../hooks/useDeck';
-import { SlideList } from '../components/SlideList';
-import { SlideCanvas } from '../components/SlideCanvas';
-import { StylePanel } from '../components/StylePanel';
-import { ExportDialog } from '../components/ExportDialog';
-import { AIOptimizeButton } from '../components/AIOptimizeButton';
+import { SlideThumbnailList } from '../components/editor/SlideThumbnailList';
+import { EditorCanvas } from '../components/editor/EditorCanvas';
+import { PropertyPanel } from '../components/editor/PropertyPanel';
+import { useEditorStore } from '../hooks/useEditorStore';
+import { useAIChat } from '../hooks/useAIChat';
 
+/**
+ * 编辑器页面
+ * 三栏布局：SlideThumbnailList | EditorCanvas | PropertyPanel
+ * 从 useAIChat.deckHtml 初始化 useEditorStore.deckHtml
+ */
 export default function Editor() {
   const navigate = useNavigate();
-  const deck = useDeck(s => s.deck);
-  const currentSlideIndex = useDeck(s => s.currentSlideIndex);
-  const isAiDeck = useDeck(s => s.isAiDeck);
-  const deckHtml = useDeck(s => s.deckHtml);
-  const [exportOpen, setExportOpen] = useState(false);
+  const aiDeckHtml = useAIChat((s) => s.deckHtml);
+  const editorDeckHtml = useEditorStore((s) => s.deckHtml);
+  const setDeckHtml = useEditorStore((s) => s.setDeckHtml);
+  const syncFromIframe = useEditorStore((s) => s.syncFromIframe);
 
-  if (!deck || deck.slides.length === 0) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-sm text-[var(--color-text-dim)] mb-4">还没有幻灯片数据</p>
-          <button onClick={() => navigate('/')} className="bg-[var(--color-primary)] text-white rounded-lg px-4 py-2 text-xs">返回首页</button>
-        </div>
-      </div>
-    );
-  }
+  // 从 AI 生成结果初始化编辑器
+  useEffect(() => {
+    if (aiDeckHtml && !editorDeckHtml) {
+      setDeckHtml(aiDeckHtml);
+    }
+  }, [aiDeckHtml, editorDeckHtml, setDeckHtml]);
+
+  // 编辑器修改同步回 AI store（用于导出）
+  const handleSyncToAI = () => {
+    syncFromIframe();
+    const updatedHtml = useEditorStore.getState().deckHtml;
+    useAIChat.getState().setDeckHtml(updatedHtml);
+  };
+
+  // 导出 HTML
+  const handleExport = () => {
+    handleSyncToAI();
+    const html = useEditorStore.getState().deckHtml;
+    if (!html) return;
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'presentation.html';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // 返回首页
+  const handleBack = () => {
+    handleSyncToAI();
+    navigate('/');
+  };
 
   return (
-    <div className="flex-1 flex overflow-hidden">
-      <SlideList />
-      <SlideCanvas deck={deck} currentSlideIndex={currentSlideIndex} deckHtml={isAiDeck ? deckHtml : null} />
-      <div className="flex flex-col">
-        <StylePanel />
-        <div className="p-2 border-l border-[var(--color-border)] bg-[var(--color-surface)]">
-          <AIOptimizeButton />
+    <div className="h-screen flex flex-col bg-[var(--color-bg)]">
+      {/* 顶部工具栏 */}
+      <div className="h-12 border-b border-[var(--color-border)] flex items-center justify-between px-4 shrink-0">
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => setExportOpen(true)}
-            className="w-full bg-[var(--color-primary)] text-white rounded-lg py-2 text-xs font-semibold"
+            className="text-[12px] text-[var(--color-text-dim)] hover:text-[var(--color-text)] transition-colors"
+            onClick={handleBack}
+          >
+            ← 返回
+          </button>
+          <span className="text-[13px] font-semibold text-[var(--color-text)]">幻灯片编辑器</span>
+        </div>
+        <div className="flex gap-2">
+          <button
+            className="px-3 py-1.5 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)] text-[11px] text-[var(--color-text-dim)] hover:text-[var(--color-text)]"
+            onClick={handleSyncToAI}
+          >
+            保存修改
+          </button>
+          <button
+            className="px-3 py-1.5 rounded-lg text-[11px] text-white font-semibold"
+            style={{ background: 'linear-gradient(135deg, #3b6cff, #7a5cff)' }}
+            onClick={handleExport}
           >
             导出 HTML
           </button>
-          <button
-            onClick={() => navigate('/preview')}
-            className="w-full mt-1 bg-[var(--color-surface-2)] text-[var(--color-text-dim)] border border-[var(--color-border)] rounded-lg py-1.5 text-[10px]"
-          >
-            全屏预览
-          </button>
         </div>
       </div>
-      <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} />
+
+      {/* 三栏布局 */}
+      <div className="flex-1 flex overflow-hidden">
+        <SlideThumbnailList />
+        <EditorCanvas />
+        <PropertyPanel />
+      </div>
     </div>
   );
 }
