@@ -77,6 +77,7 @@ export function StyleTab() {
     reader.onload = () => {
       const base64 = reader.result as string;
       const doc = iframeRef.contentDocument;
+      if (!doc) return;
       const el = doc.querySelector(selectedElement.cssPath) as HTMLImageElement;
       if (el) {
         el.src = base64;
