@@ -20,6 +20,14 @@ export function EditorCanvas() {
   const syncFromIframe = useEditorStore((s) => s.syncFromIframe);
   const [scale, setScale] = useState(1);
 
+  // 【修复4】防止 syncFromIframe → deckHtml 更新 → iframe 重新加载
+  // 用 ref 追踪上次写入 iframe 的 HTML，只在真正需要时才更新 srcDoc
+  const lastWrittenHtmlRef = useRef<string>('');
+  // 是否正在从 iframe 同步（syncFromIframe 期间不重写 iframe）
+  const syncingRef = useRef(false);
+  // 追踪 deckHtml 是否是外部更新（非 syncFromIframe 导致的）
+  const [iframeKey, setIframeKey] = useState(0);
+
   // 计算 iframe 缩放
   const updateScale = useCallback(() => {
     const container = containerRef.current;
@@ -39,17 +47,19 @@ export function EditorCanvas() {
     return () => observer.disconnect();
   }, [updateScale]);
 
-  // 注册 iframe ref 到 store
+  // 注册 iframe ref 到 store（iframe key 变化后也需要更新）
   useEffect(() => {
     if (iframeRef.current) {
       setIframeRef(iframeRef.current);
     }
-  }, [setIframeRef]);
+  }, [setIframeRef, iframeKey]);
 
   // iframe 加载后：注入编辑 runtime + 设置当前页
+  // 【修复4】只在 iframeKey 变化时重新注入（即外部更新 deckHtml 时）
+  // 不依赖 deckHtml，避免 syncFromIframe 循环触发
   useEffect(() => {
     const iframe = iframeRef.current;
-    if (!iframe || !deckHtml) return;
+    if (!iframe) return;
 
     const handleLoad = () => {
       try {
@@ -102,8 +112,17 @@ export function EditorCanvas() {
               while (el && el !== document.body) {
                 var selector = el.tagName.toLowerCase();
                 if (el.className && typeof el.className === 'string') {
-                  var cls = el.className.split(/\\s+/).filter(c => c && c !== 'is-active' && c !== 'is-prev').join('.');
+                  var cls = el.className.split(/\\s+/).filter(c => c && c !== 'is-active' && c !== 'is-prev' && c !== 'contenteditable').join('.');
                   if (cls) selector += '.' + cls;
+                }
+                // 添加 nth-child 以确保选择器唯一
+                var parent = el.parentElement;
+                if (parent) {
+                  var siblings = Array.from(parent.children).filter(function(s) { return s.tagName === el.tagName; });
+                  if (siblings.length > 1) {
+                    var idx = siblings.indexOf(el) + 1;
+                    selector += ':nth-of-type(' + idx + ')';
+                  }
                 }
                 path.unshift(selector);
                 el = el.parentElement;
@@ -127,6 +146,16 @@ export function EditorCanvas() {
               };
             }
 
+            // 【修复1】覆盖 runtime.js 的键盘拦截
+            // 在捕获阶段拦截键盘事件，当 contentEditable 元素获得焦点时
+            // 阻止事件传播到 runtime.js 的 keydown 监听器
+            document.addEventListener('keydown', function(e) {
+              var active = document.activeElement;
+              if (active && active.contentEditable === 'true') {
+                e.stopPropagation();
+              }
+            }, true);
+
             // 点击选中
             document.addEventListener('click', function(e) {
               var el = e.target;
@@ -143,6 +172,8 @@ export function EditorCanvas() {
               // 取消之前的选中
               if (currentSelected && currentSelected.contentEditable === 'true') {
                 currentSelected.contentEditable = 'false';
+                // 同步之前编辑的内容
+                window.parent.postMessage({ type: 'editor-content-changed', info: getElementInfo(currentSelected) }, '*');
               }
               currentSelected = el;
               updateHighlight(el);
@@ -158,6 +189,8 @@ export function EditorCanvas() {
               if (el.tagName === 'IMG') return;
               if (el === document.body || el === document.documentElement) return;
               e.preventDefault();
+              e.stopPropagation();
+              currentSelected = el;
               el.contentEditable = 'true';
               el.focus();
               // 选中全部文字
@@ -168,8 +201,8 @@ export function EditorCanvas() {
               sel.addRange(range);
             }, true);
 
-            // 失焦同步
-            document.addEventListener('blur', function() {
+            // 【修复2】使用 focusout 替代 blur（focusout 会冒泡）
+            document.addEventListener('focusout', function() {
               if (currentSelected && currentSelected.contentEditable === 'true') {
                 currentSelected.contentEditable = 'false';
                 window.parent.postMessage({ type: 'editor-content-changed', info: getElementInfo(currentSelected) }, '*');
@@ -190,7 +223,9 @@ export function EditorCanvas() {
                 var path = e.data.cssPath;
                 var props = e.data.props;
                 try {
-                  var target = document.querySelector(path);
+                  // 【修复3】限定在当前 active slide 范围内查找元素
+                  var activeSlide = document.querySelector('.slide.is-active');
+                  var target = activeSlide ? activeSlide.querySelector(path) : document.querySelector(path);
                   if (target) {
                     Object.keys(props).forEach(function(k) { target.style[k] = props[k]; });
                     updateHighlight(target);
@@ -247,7 +282,7 @@ export function EditorCanvas() {
 
     iframe.addEventListener('load', handleLoad);
     return () => iframe.removeEventListener('load', handleLoad);
-  }, [deckHtml, currentSlideIndex, setTotalSlides]);
+  }, [currentSlideIndex, setTotalSlides, iframeKey]);
 
   // 监听 iframe postMessage
   useEffect(() => {
@@ -256,12 +291,32 @@ export function EditorCanvas() {
         setSelectedElement(e.data.info);
       }
       if (e.data?.type === 'editor-content-changed') {
+        // 【修复4】syncFromIframe 更新 deckHtml，但不触发 iframe 重新加载
+        syncingRef.current = true;
         syncFromIframe();
+        // 同步完成后，更新 lastWrittenHtmlRef 以匹配当前 deckHtml
+        requestAnimationFrame(() => {
+          syncingRef.current = false;
+        });
       }
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [setSelectedElement, syncFromIframe]);
+
+  // 【修复4】只在 deckHtml 外部更新时重写 iframe srcDoc
+  // syncFromIframe 导致的 deckHtml 变化不重写（避免循环刷新丢失修改）
+  useEffect(() => {
+    if (!deckHtml || syncingRef.current) return;
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    // 只在 HTML 确实不同时才更新
+    if (deckHtml !== lastWrittenHtmlRef.current) {
+      lastWrittenHtmlRef.current = deckHtml;
+      // 通过 key 变化强制 iframe 重新加载
+      setIframeKey((k) => k + 1);
+    }
+  }, [deckHtml]);
 
   return (
     <div ref={containerRef} className="flex-1 flex items-center justify-center p-5 relative overflow-hidden bg-[#111118]">
@@ -278,6 +333,7 @@ export function EditorCanvas() {
           }}
         >
           <iframe
+            key={iframeKey}
             ref={iframeRef}
             srcDoc={deckHtml}
             width="960"
