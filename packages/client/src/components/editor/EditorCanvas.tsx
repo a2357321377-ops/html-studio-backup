@@ -78,6 +78,7 @@ export function EditorCanvas() {
 
         // 注入编辑 runtime 脚本
         const script = doc.createElement('script');
+        script.setAttribute('data-editor-runtime', '1');
         script.textContent = `
           (function() {
             var currentSelected = null;
@@ -86,6 +87,7 @@ export function EditorCanvas() {
             function getHighlight(doc) {
               if (!highlightEl) {
                 highlightEl = doc.createElement('div');
+                highlightEl.setAttribute('data-editor-highlight', '1');
                 highlightEl.style.cssText = 'position:absolute;pointer-events:none;border:2px solid #3b6cff;border-radius:4px;z-index:9999;transition:all 0.15s ease;';
                 doc.body.appendChild(highlightEl);
               }
@@ -291,21 +293,23 @@ export function EditorCanvas() {
         setSelectedElement(e.data.info);
       }
       if (e.data?.type === 'editor-content-changed') {
-        // 【修复4】syncFromIframe 更新 deckHtml，但不触发 iframe 重新加载
+        // 【关键】syncFromIframe 更新 deckHtml，但绝不能触发 iframe 重建
+        // 先标记正在同步，防止 deckHtml useEffect 触发 iframeKey 变化
         syncingRef.current = true;
         syncFromIframe();
-        // 同步完成后，更新 lastWrittenHtmlRef 以匹配当前 deckHtml
-        requestAnimationFrame(() => {
-          syncingRef.current = false;
-        });
+        // 同步完成后，立即更新 lastWrittenHtmlRef 匹配新的 deckHtml
+        // 这样 deckHtml useEffect 中的比较就不会触发 iframe 重建
+        const newHtml = useEditorStore.getState().deckHtml;
+        lastWrittenHtmlRef.current = newHtml;
+        syncingRef.current = false;
       }
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [setSelectedElement, syncFromIframe]);
 
-  // 【修复4】只在 deckHtml 外部更新时重写 iframe srcDoc
-  // syncFromIframe 导致的 deckHtml 变化不重写（避免循环刷新丢失修改）
+  // 【关键】只在 deckHtml 外部更新时重写 iframe srcDoc
+  // syncFromIframe 导致的 deckHtml 变化绝不重写（避免循环刷新丢失修改）
   useEffect(() => {
     if (!deckHtml || syncingRef.current) return;
     const iframe = iframeRef.current;

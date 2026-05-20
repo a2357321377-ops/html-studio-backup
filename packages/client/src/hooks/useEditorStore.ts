@@ -71,7 +71,17 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
   syncFromIframe: () => {
     const iframe = get().iframeRef;
     if (!iframe?.contentDocument) return;
-    const html = iframe.contentDocument.documentElement.outerHTML;
+    const doc = iframe.contentDocument;
+
+    // 同步前移除编辑器注入的临时元素，避免它们被写入 deckHtml
+    // 1. 移除高亮框
+    const highlight = doc.querySelector('[data-editor-highlight]');
+    if (highlight) highlight.remove();
+    // 2. 移除编辑 runtime script
+    const editorScript = doc.querySelector('[data-editor-runtime]');
+    if (editorScript) editorScript.remove();
+
+    const html = doc.documentElement.outerHTML;
     set({ deckHtml: `<!DOCTYPE html>\n${html}` });
   },
 
