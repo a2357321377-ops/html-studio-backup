@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { useEditorStore } from '../../hooks/useEditorStore';
+import { useEditorStore, cleanEditorArtifacts } from '../../hooks/useEditorStore';
+import { useAIChat } from '../../hooks/useAIChat';
 
 /**
  * 编辑器中间区域：iframe 预览 + 编辑 runtime
@@ -20,13 +21,13 @@ export function EditorCanvas() {
   const syncFromIframe = useEditorStore((s) => s.syncFromIframe);
   const [scale, setScale] = useState(1);
 
-  // 【修复4】防止 syncFromIframe → deckHtml 更新 → iframe 重新加载
-  // 用 ref 追踪上次写入 iframe 的 HTML，只在真正需要时才更新 srcDoc
-  const lastWrittenHtmlRef = useRef<string>('');
-  // 是否正在从 iframe 同步（syncFromIframe 期间不重写 iframe）
-  const syncingRef = useRef(false);
-  // 追踪 deckHtml 是否是外部更新（非 syncFromIframe 导致的）
+  // 【关键修复】iframe srcDoc 使用独立状态，与 deckHtml 解耦
+  // 问题：之前 srcDoc={deckHtml} 直接绑定 store，syncFromIframe 更新 deckHtml 时
+  // React 会将新 srcDoc 值设置到 iframe DOM 属性上，导致 iframe 重新加载
+  // 解决：srcDoc 只在外部更新 deckHtml 时才更新，syncFromIframe 不触发 srcDoc 变化
   const [iframeKey, setIframeKey] = useState(0);
+  const [iframeSrcDoc, setIframeSrcDoc] = useState(deckHtml);
+  const lastWrittenHtmlRef = useRef<string>(deckHtml || '');
 
   // 计算 iframe 缩放
   const updateScale = useCallback(() => {
@@ -161,39 +162,69 @@ export function EditorCanvas() {
             // 点击选中
             document.addEventListener('click', function(e) {
               var el = e.target;
-              // 忽略高亮框自身和 slide 容器
-              if (el === highlightEl || el.classList.contains('slide')) return;
+              // 忽略高亮框自身
+              if (el === highlightEl) return;
+
+              // 检查是否点击了 slide 区域
+              var clickedSlide = el.closest ? el.closest('.slide') : null;
+
               // 找到有意义的元素（非纯容器 div）
-              while (el && el.parentElement && !el.parentElement.classList.contains('slide') && el.tagName !== 'IMG' && el.tagName !== 'H1' && el.tagName !== 'H2' && el.tagName !== 'H3' && el.tagName !== 'P' && el.tagName !== 'SPAN' && el.tagName !== 'LI' && el.tagName !== 'A') {
-                el = el.parentElement;
+              var target = el;
+              while (target && target.parentElement && !target.parentElement.classList.contains('slide') && target.tagName !== 'IMG' && target.tagName !== 'H1' && target.tagName !== 'H2' && target.tagName !== 'H3' && target.tagName !== 'P' && target.tagName !== 'SPAN' && target.tagName !== 'LI' && target.tagName !== 'A') {
+                target = target.parentElement;
               }
-              if (el === document.body || el === document.documentElement) return;
+
+              // 如果没找到有意义的元素，或点击的是 slide 本身/body → 取消选中
+              var isMeaningful = target && target !== document.body && target !== document.documentElement && !target.classList.contains('slide');
+
+              if (!isMeaningful) {
+                if (currentSelected) {
+                  if (currentSelected.contentEditable === 'true') {
+                    currentSelected.contentEditable = 'false';
+                    currentSelected.style.caretColor = '';
+                    window.parent.postMessage({ type: 'editor-content-changed', info: getElementInfo(currentSelected) }, '*');
+                  }
+                  currentSelected = null;
+                }
+                updateHighlight(null);
+                window.parent.postMessage({ type: 'editor-element-deselected' }, '*');
+                return;
+              }
+
               e.preventDefault();
               e.stopPropagation();
 
               // 取消之前的选中
               if (currentSelected && currentSelected.contentEditable === 'true') {
                 currentSelected.contentEditable = 'false';
-                // 同步之前编辑的内容
+                currentSelected.style.caretColor = '';
                 window.parent.postMessage({ type: 'editor-content-changed', info: getElementInfo(currentSelected) }, '*');
               }
-              currentSelected = el;
-              updateHighlight(el);
-              window.parent.postMessage({ type: 'editor-element-selected', info: getElementInfo(el) }, '*');
+              currentSelected = target;
+              updateHighlight(target);
+              window.parent.postMessage({ type: 'editor-element-selected', info: getElementInfo(target) }, '*');
             }, true);
 
             // 双击编辑文字
             document.addEventListener('dblclick', function(e) {
               var el = e.target;
+              // 点击 slide 空白或高亮框 → 不触发编辑，阻止默认选中文字行为
+              if (el.classList.contains('slide') || el === highlightEl) {
+                e.preventDefault();
+                return;
+              }
               while (el && el.parentElement && !el.parentElement.classList.contains('slide') && el.tagName !== 'IMG' && el.tagName !== 'H1' && el.tagName !== 'H2' && el.tagName !== 'H3' && el.tagName !== 'P' && el.tagName !== 'SPAN' && el.tagName !== 'LI' && el.tagName !== 'A') {
                 el = el.parentElement;
               }
               if (el.tagName === 'IMG') return;
-              if (el === document.body || el === document.documentElement) return;
+              if (el === document.body || el === document.documentElement || el.classList.contains('slide')) return;
               e.preventDefault();
               e.stopPropagation();
               currentSelected = el;
               el.contentEditable = 'true';
+              // 设置光标颜色为当前文字颜色，确保在暗色背景上也能看到光标
+              var textColor = window.getComputedStyle(el).color;
+              el.style.caretColor = textColor;
               el.focus();
               // 选中全部文字
               var range = document.createRange();
@@ -207,6 +238,8 @@ export function EditorCanvas() {
             document.addEventListener('focusout', function() {
               if (currentSelected && currentSelected.contentEditable === 'true') {
                 currentSelected.contentEditable = 'false';
+                // 清除编辑时设置的光标颜色，避免残留到导出 HTML
+                currentSelected.style.caretColor = '';
                 window.parent.postMessage({ type: 'editor-content-changed', info: getElementInfo(currentSelected) }, '*');
               }
             }, true);
@@ -291,36 +324,54 @@ export function EditorCanvas() {
     const handleMessage = (e: MessageEvent) => {
       if (e.data?.type === 'editor-element-selected') {
         setSelectedElement(e.data.info);
+        // 选中时同步 HTML（高亮框出现在 DOM 中，需清理后同步到 store/localStorage）
+        syncFromIframe();
+        // 立即更新 ref，防止 useEffect 检测到 deckHtml 变化后重新加载 iframe
+        lastWrittenHtmlRef.current = useEditorStore.getState().deckHtml;
+      }
+      if (e.data?.type === 'editor-element-deselected') {
+        setSelectedElement(null);
+        // 取消选中时同步 HTML（高亮框被隐藏但 DOM 仍在，需清理后同步到 store/localStorage）
+        syncFromIframe();
+        lastWrittenHtmlRef.current = useEditorStore.getState().deckHtml;
       }
       if (e.data?.type === 'editor-content-changed') {
-        // 【关键】syncFromIframe 更新 deckHtml，但绝不能触发 iframe 重建
-        // 先标记正在同步，防止 deckHtml useEffect 触发 iframeKey 变化
-        syncingRef.current = true;
+        // 内容变化时同步 HTML 到 store/localStorage
         syncFromIframe();
-        // 同步完成后，立即更新 lastWrittenHtmlRef 匹配新的 deckHtml
-        // 这样 deckHtml useEffect 中的比较就不会触发 iframe 重建
-        const newHtml = useEditorStore.getState().deckHtml;
-        lastWrittenHtmlRef.current = newHtml;
-        syncingRef.current = false;
+        lastWrittenHtmlRef.current = useEditorStore.getState().deckHtml;
       }
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [setSelectedElement, syncFromIframe]);
 
-  // 【关键】只在 deckHtml 外部更新时重写 iframe srcDoc
-  // syncFromIframe 导致的 deckHtml 变化绝不重写（避免循环刷新丢失修改）
+  // 【关键修复】只在 deckHtml 外部更新时重写 iframe
+  // 通过比较 deckHtml 与 lastWrittenHtmlRef 判断是否是外部更新
+  // syncFromIframe 后会更新 lastWrittenHtmlRef，所以不会触发循环
   useEffect(() => {
-    if (!deckHtml || syncingRef.current) return;
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-    // 只在 HTML 确实不同时才更新
+    if (!deckHtml) return;
     if (deckHtml !== lastWrittenHtmlRef.current) {
       lastWrittenHtmlRef.current = deckHtml;
-      // 通过 key 变化强制 iframe 重新加载
+      setIframeSrcDoc(deckHtml);
       setIframeKey((k) => k + 1);
     }
   }, [deckHtml]);
+
+  // 组件卸载时：同步清理后的 HTML 回 store（不修改 iframe DOM）
+  // 确保离开编辑器时 deckHtml 不包含编辑器残留
+  useEffect(() => {
+    return () => {
+      const iframe = iframeRef.current;
+      if (!iframe?.contentDocument) return;
+      const doc = iframe.contentDocument;
+      // 直接读取 outerHTML，不修改 iframe DOM
+      const rawHtml = doc.documentElement.outerHTML;
+      const finalHtml = cleanEditorArtifacts(`<!DOCTYPE html>\n${rawHtml}`);
+      useEditorStore.setState({ deckHtml: finalHtml });
+      // 同步到 AI store（首页使用 AI store 的 deckHtml）
+      useAIChat.getState().setDeckHtml(finalHtml);
+    };
+  }, []);
 
   return (
     <div ref={containerRef} className="flex-1 flex items-center justify-center p-5 relative overflow-hidden bg-[#111118]">
@@ -339,7 +390,7 @@ export function EditorCanvas() {
           <iframe
             key={iframeKey}
             ref={iframeRef}
-            srcDoc={deckHtml}
+            srcDoc={iframeSrcDoc}
             width="960"
             height="540"
             style={{ transform: `scale(${scale})`, transformOrigin: 'top left', border: 'none' }}

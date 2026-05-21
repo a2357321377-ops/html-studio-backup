@@ -5,6 +5,7 @@ import { EditorCanvas } from '../components/editor/EditorCanvas';
 import { PropertyPanel } from '../components/editor/PropertyPanel';
 import { useEditorStore } from '../hooks/useEditorStore';
 import { useAIChat } from '../hooks/useAIChat';
+import { cleanEditorArtifacts } from '../hooks/useEditorStore';
 
 /**
  * 编辑器页面
@@ -18,24 +19,24 @@ export default function Editor() {
   const setDeckHtml = useEditorStore((s) => s.setDeckHtml);
   const syncFromIframe = useEditorStore((s) => s.syncFromIframe);
 
-  // 从 AI 生成结果初始化编辑器
+  // 从 AI 生成结果初始化编辑器（确保 HTML 是干净的）
   useEffect(() => {
     if (aiDeckHtml && !editorDeckHtml) {
-      setDeckHtml(aiDeckHtml);
+      setDeckHtml(cleanEditorArtifacts(aiDeckHtml));
     }
   }, [aiDeckHtml, editorDeckHtml, setDeckHtml]);
 
   // 编辑器修改同步回 AI store（用于导出）
   const handleSyncToAI = () => {
     syncFromIframe();
-    const updatedHtml = useEditorStore.getState().deckHtml;
+    const updatedHtml = cleanEditorArtifacts(useEditorStore.getState().deckHtml);
     useAIChat.getState().setDeckHtml(updatedHtml);
   };
 
   // 导出 HTML
   const handleExport = () => {
     handleSyncToAI();
-    const html = useEditorStore.getState().deckHtml;
+    const html = cleanEditorArtifacts(useEditorStore.getState().deckHtml);
     if (!html) return;
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);

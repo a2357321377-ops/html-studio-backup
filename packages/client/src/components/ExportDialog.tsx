@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useDeck } from '../hooks/useDeck';
 import { renderDeck } from '../lib/renderer';
 import { Modal } from './Modal';
+import { cleanEditorArtifacts } from '../hooks/useEditorStore';
 
 interface ExportDialogProps {
   open: boolean;
@@ -27,7 +28,7 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
     try {
       let html: string;
       if (isAiDeck && deckHtml) {
-        html = deckHtml;
+        html = cleanEditorArtifacts(deckHtml);
       } else if (deck) {
         html = await renderDeck(deck, {
           includeRuntime,

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { cleanEditorArtifacts } from './useEditorStore';
 
 export interface ChatMessage {
   id: string;
@@ -87,6 +88,17 @@ export const useAIChat = create<AIChatState>()(
           originalPrompt: '',
         }),
     }),
-    { name: 'html-studio-ai-chat' }
+    {
+      name: 'html-studio-ai-chat',
+      // 从 localStorage 加载时，自动清理 deckHtml 中的编辑器残留
+      // 确保即使 localStorage 中有旧的脏数据（修复前存入的），也不会在首页显示选择框
+      merge: (persistedState, currentState) => {
+        const merged = { ...currentState, ...(persistedState as Partial<AIChatState>) };
+        if (merged.deckHtml) {
+          merged.deckHtml = cleanEditorArtifacts(merged.deckHtml);
+        }
+        return merged;
+      },
+    }
   )
 );

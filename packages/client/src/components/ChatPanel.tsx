@@ -6,6 +6,7 @@ import { useAIConfig } from '../hooks/useAIConfig';
 import { useAIChat } from '../hooks/useAIChat';
 import { buildDeckPrompt, buildEditPrompt } from '../lib/ai-client';
 import { streamAI } from '../lib/ai-stream';
+import { cleanEditorArtifacts } from '../hooks/useEditorStore';
 
 interface ChatPanelProps {
   onHtmlUpdate: (html: string) => void;
@@ -95,10 +96,11 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
 
     if (isEditMode) {
       // 编辑模式：发送已有 HTML + 修改指令
+      // 确保 HTML 是干净的（不含编辑器残留），避免 AI 误解结构
       aiMessages = buildEditPrompt(
         fileContent,
         originalPrompt,
-        deckHtml,
+        cleanEditorArtifacts(deckHtml),
         userMsg,
       );
     } else {

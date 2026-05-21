@@ -1,4 +1,24 @@
 import { create } from 'zustand';
+import { useAIChat } from './useAIChat';
+
+/**
+ * 清理 HTML 中的编辑器注入元素（高亮框、编辑 runtime、contenteditable 属性）
+ * 用于预览、演讲者模式、导出等非编辑场景
+ */
+export function cleanEditorArtifacts(html: string): string {
+  if (!html) return '';
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  // 移除高亮框
+  doc.querySelectorAll('[data-editor-highlight]').forEach(el => el.remove());
+  // 移除编辑 runtime script
+  doc.querySelectorAll('[data-editor-runtime]').forEach(el => el.remove());
+  // 移除 contenteditable 属性（编辑器可能给元素添加了此属性）
+  doc.querySelectorAll('[contenteditable]').forEach(el => {
+    el.removeAttribute('contenteditable');
+  });
+  return `<!DOCTYPE html>\n${doc.documentElement.outerHTML}`;
+}
 
 export type EditorTab = 'style' | 'theme' | 'fx' | 'layout';
 
@@ -45,6 +65,10 @@ interface EditorState {
   // 从 iframe 同步 HTML 回 store
   syncFromIframe: () => void;
 
+  // 获取清理后的 HTML（移除编辑器注入的临时元素和脚本）
+  // 用于预览、演讲者模式、导出等非编辑场景
+  getCleanHtml: () => string;
+
   // 重置
   reset: () => void;
 }
@@ -73,16 +97,18 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     if (!iframe?.contentDocument) return;
     const doc = iframe.contentDocument;
 
-    // 同步前移除编辑器注入的临时元素，避免它们被写入 deckHtml
-    // 1. 移除高亮框
-    const highlight = doc.querySelector('[data-editor-highlight]');
-    if (highlight) highlight.remove();
-    // 2. 移除编辑 runtime script
-    const editorScript = doc.querySelector('[data-editor-runtime]');
-    if (editorScript) editorScript.remove();
+    // 直接读取 outerHTML，不修改 iframe DOM（避免破坏编辑器 runtime 的引用）
+    const rawHtml = doc.documentElement.outerHTML;
+    // 用 DOMParser 清理编辑器注入的元素后存入 store
+    const cleanHtml = cleanEditorArtifacts(`<!DOCTYPE html>\n${rawHtml}`);
+    set({ deckHtml: cleanHtml });
+    // 同步到 AI store（首页使用 AI store 的 deckHtml，且 persist 到 localStorage）
+    // 确保 localStorage 中始终是干净的 HTML，避免刷新后首页残留编辑器痕迹
+    useAIChat.getState().setDeckHtml(cleanHtml);
+  },
 
-    const html = doc.documentElement.outerHTML;
-    set({ deckHtml: `<!DOCTYPE html>\n${html}` });
+  getCleanHtml: () => {
+    return cleanEditorArtifacts(get().deckHtml);
   },
 
   reset: () =>

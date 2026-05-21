@@ -1,28 +1,44 @@
-import { useRef, useEffect, useCallback } from 'react';
-import { useEditorStore } from '../../hooks/useEditorStore';
+import { useRef, useEffect, useState, useCallback } from 'react';
+import { useEditorStore, cleanEditorArtifacts } from '../../hooks/useEditorStore';
 import { ImageUploader } from './ImageUploader';
 
 /**
  * 左侧幻灯片缩略图列表
- * - 每个 slide 用小 iframe 渲染缩略图
- * - 支持切换当前编辑页、删除页、添加页
+ *
+ * 使用防抖的 deckHtml 避免编辑过程中频繁重建缩略图 iframe：
+ * 用户在 iframe 中编辑文字 → syncFromIframe 更新 deckHtml → 如果每次都重建缩略图，
+ * 所有 iframe 会闪烁重载。因此用 300ms 防抖延迟更新缩略图。
  */
 export function SlideThumbnailList() {
-  const deckHtml = useEditorStore((s) => s.deckHtml);
   const currentSlideIndex = useEditorStore((s) => s.currentSlideIndex);
   const totalSlides = useEditorStore((s) => s.totalSlides);
   const setCurrentSlideIndex = useEditorStore((s) => s.setCurrentSlideIndex);
   const iframeRef = useEditorStore((s) => s.iframeRef);
   const syncFromIframe = useEditorStore((s) => s.syncFromIframe);
-  const setDeckHtml = useEditorStore((s) => s.setDeckHtml);
+
+  // 防抖：deckHtml 变化后延迟 300ms 再更新缩略图
+  const rawDeckHtml = useEditorStore((s) => s.deckHtml);
+  const [deckHtml, setDebouncedHtml] = useState(rawDeckHtml);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      setDebouncedHtml(rawDeckHtml);
+    }, 300);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [rawDeckHtml]);
 
   // 解析出每页 slide 的 HTML 片段
   const getSlideHtmlList = useCallback((): string[] => {
     if (!deckHtml) return [];
+    // 先清理编辑器残留，确保 DOMParser 解析的是干净的 HTML
+    const cleanSource = cleanEditorArtifacts(deckHtml);
     const parser = new DOMParser();
-    const doc = parser.parseFromString(deckHtml, 'text/html');
+    const doc = parser.parseFromString(cleanSource, 'text/html');
     const slides = doc.querySelectorAll('.slide');
-    const baseHtml = deckHtml;
     const results: string[] = [];
     slides.forEach((slide, i) => {
       // 构建一个只显示当前 slide 的完整 HTML
@@ -38,6 +54,15 @@ export function SlideThumbnailList() {
   }, [deckHtml]);
 
   const slideHtmlList = getSlideHtmlList();
+
+  // 用 HTML 内容的简单哈希作为 iframe key，避免相同内容时重建
+  const simpleHash = (s: string): number => {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+      h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+    }
+    return h;
+  };
 
   // 切换当前页
   const handleSelectSlide = (idx: number) => {
@@ -105,9 +130,10 @@ export function SlideThumbnailList() {
             }`}
             onClick={() => handleSelectSlide(i)}
           >
-            {/* 缩略图 iframe */}
+            {/* 缩略图 iframe — key 基于 HTML 哈希，内容不变时不重建 */}
             <div className="w-full" style={{ aspectRatio: '16/9' }}>
               <iframe
+                key={simpleHash(html)}
                 srcDoc={html}
                 className="w-full h-full border-none pointer-events-none"
                 style={{ transform: 'scale(1)', transformOrigin: 'top left' }}

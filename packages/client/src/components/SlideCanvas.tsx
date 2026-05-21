@@ -1,6 +1,7 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import type { Deck } from '@html-studio/shared';
 import { renderDeck } from '../lib/renderer';
+import { cleanEditorArtifacts } from '../hooks/useEditorStore';
 
 interface SlideCanvasProps {
   deck: Deck;
@@ -39,8 +40,8 @@ export function SlideCanvas({ deck, currentSlideIndex, deckHtml }: SlideCanvasPr
     let cancelled = false;
 
     if (deckHtml) {
-      // AI 生成的 HTML 直接使用
-      setHtml(deckHtml);
+      // AI 生成的 HTML — 清理编辑器残留后使用
+      setHtml(cleanEditorArtifacts(deckHtml));
       setRendering(false);
       return;
     }

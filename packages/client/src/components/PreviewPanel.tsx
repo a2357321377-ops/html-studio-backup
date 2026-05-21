@@ -1,7 +1,8 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FullscreenPresenter } from './FullscreenPresenter';
 import { useAIChat } from '../hooks/useAIChat';
+import { cleanEditorArtifacts } from '../hooks/useEditorStore';
 
 interface PreviewPanelProps {
   deckHtml: string;
@@ -18,6 +19,9 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
   const generationProgress = useAIChat((s) => s.generationProgress);
   const generationPhase = useAIChat((s) => s.generationPhase);
   const navigate = useNavigate();
+
+  // 清理编辑器注入的元素，确保预览/导出/演讲者模式中不会出现编辑痕迹
+  const cleanHtml = useMemo(() => cleanEditorArtifacts(deckHtml), [deckHtml]);
 
   // 计算 iframe 缩放
   const updateScale = useCallback(() => {
@@ -41,7 +45,7 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
   // iframe 加载完成后，恢复当前页的 is-active 状态
   useEffect(() => {
     const iframe = iframeRef.current;
-    if (!iframe || !deckHtml) return;
+    if (!iframe || !cleanHtml) return;
 
     const handleLoad = () => {
       try {
@@ -60,7 +64,7 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
 
     iframe.addEventListener('load', handleLoad);
     return () => iframe.removeEventListener('load', handleLoad);
-  }, [deckHtml, currentPage]);
+  }, [cleanHtml, currentPage]);
 
   // 从 HTML 中估算页数
   useEffect(() => {
@@ -96,8 +100,8 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
 
   // 导出 HTML
   const handleExport = () => {
-    if (!deckHtml) return;
-    const blob = new Blob([deckHtml], { type: 'text/html;charset=utf-8' });
+    if (!cleanHtml) return;
+    const blob = new Blob([cleanHtml], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -155,7 +159,7 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
           >
             <iframe
               ref={iframeRef}
-              srcDoc={deckHtml}
+              srcDoc={cleanHtml}
               width="960"
               height="540"
               style={{ transform: `scale(${scale})`, transformOrigin: 'top left', border: 'none' }}
@@ -218,9 +222,9 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
       </div>
 
       {/* 全屏演讲模式 */}
-      {fullscreen && deckHtml && (
+      {fullscreen && cleanHtml && (
         <FullscreenPresenter
-          deckHtml={deckHtml}
+          deckHtml={cleanHtml}
           totalPages={totalPages}
           onClose={() => setFullscreen(false)}
         />
