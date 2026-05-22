@@ -1,8 +1,9 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SlideThumbnailList } from '../components/editor/SlideThumbnailList';
 import { EditorCanvas } from '../components/editor/EditorCanvas';
 import { PropertyPanel } from '../components/editor/PropertyPanel';
+import { FullscreenPresenter } from '../components/FullscreenPresenter';
 import { useEditorStore } from '../hooks/useEditorStore';
 import { useAIChat } from '../hooks/useAIChat';
 import { cleanEditorArtifacts } from '../hooks/useEditorStore';
@@ -22,6 +23,10 @@ export default function Editor() {
   const canRedo = useEditorStore((s) => s.canRedo);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
+  const totalSlides = useEditorStore((s) => s.totalSlides);
+
+  // 全屏演讲模式
+  const [showPresenter, setShowPresenter] = useState(false);
 
   // 从 AI 生成结果初始化编辑器（确保 HTML 是干净的）
   useEffect(() => {
@@ -84,6 +89,12 @@ export default function Editor() {
     navigate('/');
   };
 
+  // 进入全屏演讲
+  const handleStartPresenter = () => {
+    handleSyncToAI();
+    setShowPresenter(true);
+  };
+
   return (
     <div className="h-screen flex flex-col bg-[var(--color-bg)]">
       {/* 顶部工具栏 */}
@@ -123,6 +134,12 @@ export default function Editor() {
             保存修改
           </button>
           <button
+            className="px-3 py-1.5 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)] text-[11px] text-[var(--color-text-dim)] hover:text-[var(--color-text)]"
+            onClick={handleStartPresenter}
+          >
+            ▶ 演讲
+          </button>
+          <button
             className="px-3 py-1.5 rounded-lg text-[11px] text-white font-semibold"
             style={{ background: 'linear-gradient(135deg, #3b6cff, #7a5cff)' }}
             onClick={handleExport}
@@ -138,6 +155,15 @@ export default function Editor() {
         <EditorCanvas />
         <PropertyPanel />
       </div>
+
+      {/* 全屏演讲模式 */}
+      {showPresenter && (
+        <FullscreenPresenter
+          deckHtml={cleanEditorArtifacts(useEditorStore.getState().deckHtml)}
+          totalPages={totalSlides}
+          onClose={() => setShowPresenter(false)}
+        />
+      )}
     </div>
   );
 }

@@ -8,13 +8,32 @@ const runtimeScript = `
   var currentSelected = null;
   var highlightEl = null;
   var originalContent = null;
+  var isDragging = false;
+  var isResizing = false;
+  var DRAG_THRESHOLD = 3;
 
   function getHighlight(doc) {
     if (!highlightEl) {
       highlightEl = doc.createElement('div');
       highlightEl.setAttribute('data-editor-highlight', '1');
-      highlightEl.style.cssText = 'position:absolute;pointer-events:none;border:2px solid #3b6cff;border-radius:4px;z-index:9999;transition:all 0.15s ease;';
+      highlightEl.style.cssText = 'position:absolute;pointer-events:none;border:2px solid #3b6cff;border-radius:4px;z-index:9999;';
       doc.body.appendChild(highlightEl);
+
+      // 8 个 resize 手柄
+      var dirs = ['nw','n','ne','w','e','sw','s','se'];
+      var cursors = {nw:'nw-resize',n:'n-resize',ne:'ne-resize',w:'w-resize',e:'e-resize',sw:'sw-resize',s:'s-resize',se:'se-resize'};
+      dirs.forEach(function(dir) {
+        var h = doc.createElement('div');
+        h.setAttribute('data-resize-handle', dir);
+        h.style.cssText = 'position:absolute;width:8px;height:8px;background:#3b6cff;border:1px solid #fff;border-radius:2px;pointer-events:auto;z-index:10001;cursor:' + cursors[dir] + ';';
+        if (dir.indexOf('n') >= 0) h.style.top = '-5px';
+        if (dir.indexOf('s') >= 0) h.style.bottom = '-5px';
+        if (dir.indexOf('w') >= 0) h.style.left = '-5px';
+        if (dir.indexOf('e') >= 0) h.style.right = '-5px';
+        if (dir === 'n' || dir === 's') h.style.left = 'calc(50% - 4px)';
+        if (dir === 'w' || dir === 'e') h.style.top = 'calc(50% - 4px)';
+        highlightEl.appendChild(h);
+      });
     }
     return highlightEl;
   }
@@ -24,13 +43,15 @@ const runtimeScript = `
     var rect = el.getBoundingClientRect();
     var slide = el.closest('.slide');
     if (!slide) return;
-    var slideRect = slide.getBoundingClientRect();
     var h = getHighlight(document);
     h.style.display = 'block';
     h.style.left = (rect.left - 2) + 'px';
     h.style.top = (rect.top - 2) + 'px';
     h.style.width = (rect.width + 4) + 'px';
     h.style.height = (rect.height + 4) + 'px';
+    // 选中元素时允许高亮框交互（拖拽移动）
+    h.style.pointerEvents = 'auto';
+    h.style.cursor = 'move';
   }
 
   function deselectCurrent() {
@@ -44,6 +65,8 @@ const runtimeScript = `
       originalContent = null;
     }
     currentSelected = null;
+    isDragging = false;
+    isResizing = false;
     updateHighlight(null);
   }
 
@@ -82,9 +105,178 @@ const runtimeScript = `
       textAlign: cs.textAlign,
       cssPath: getCssPath(el),
       isImage: el.tagName === 'IMG',
-      imageSrc: el.tagName === 'IMG' ? el.src : ''
+      imageSrc: el.tagName === 'IMG' ? el.src : '',
+      position: el.style.position || cs.position,
+      left: el.style.left || '0px',
+      top: el.style.top || '0px',
+      width: el.style.width || '',
+      height: el.style.height || ''
     };
   }
+
+  // 确保 position: relative，用于拖拽移动
+  function ensureRelative(el) {
+    if (el.style.position !== 'relative' && el.style.position !== 'absolute') {
+      el.style.position = 'relative';
+      el.style.left = '0px';
+      el.style.top = '0px';
+    }
+  }
+
+  // --- 拖拽移动 ---
+  function startDragMove(e) {
+    if (!currentSelected || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    var el = currentSelected;
+    var wasEditable = el.contentEditable === 'true';
+    if (wasEditable) {
+      el.contentEditable = 'false';
+      el.blur();
+    }
+
+    ensureRelative(el);
+    var startLeft = parseFloat(el.style.left) || 0;
+    var startTop = parseFloat(el.style.top) || 0;
+    var startX = e.clientX;
+    var startY = e.clientY;
+    var moved = false;
+
+    document.body.style.userSelect = 'none';
+
+    function onMove(ev) {
+      var dx = ev.clientX - startX;
+      var dy = ev.clientY - startY;
+      if (!moved && Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+      moved = true;
+      isDragging = true;
+      el.style.left = (startLeft + dx) + 'px';
+      el.style.top = (startTop + dy) + 'px';
+      updateHighlight(el);
+    }
+
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.userSelect = '';
+      isDragging = false;
+
+      if (wasEditable && el.tagName !== 'IMG') {
+        el.contentEditable = 'true';
+        el.style.caretColor = '#000';
+      }
+
+      if (moved) {
+        window.parent.postMessage({ type: 'editor-element-moved', info: getElementInfo(el) }, '*');
+      }
+    }
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
+
+  // --- 缩放 ---
+  function startResize(e, dir) {
+    if (!currentSelected || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    var el = currentSelected;
+    var wasEditable = el.contentEditable === 'true';
+    if (wasEditable) {
+      el.contentEditable = 'false';
+      el.blur();
+    }
+
+    var isImg = el.tagName === 'IMG';
+    var startX = e.clientX;
+    var startY = e.clientY;
+    var startRect = el.getBoundingClientRect();
+    var startWidth = startRect.width;
+    var startHeight = startRect.height;
+    var startFontSize = parseFloat(window.getComputedStyle(el).fontSize);
+    var startLeft = parseFloat(el.style.left) || 0;
+    var startTop = parseFloat(el.style.top) || 0;
+    isResizing = true;
+
+    document.body.style.userSelect = 'none';
+
+    function onMove(ev) {
+      var dx = ev.clientX - startX;
+      var dy = ev.clientY - startY;
+      var newWidth = startWidth;
+      var newHeight = startHeight;
+
+      // 根据方向计算新尺寸
+      if (dir.indexOf('e') >= 0) newWidth = startWidth + dx;
+      if (dir.indexOf('w') >= 0) newWidth = startWidth - dx;
+      if (dir.indexOf('s') >= 0) newHeight = startHeight + dy;
+      if (dir.indexOf('n') >= 0) newHeight = startHeight - dy;
+
+      newWidth = Math.max(30, newWidth);
+      newHeight = Math.max(20, newHeight);
+
+      if (isImg) {
+        // 图片：设置宽高
+        el.style.width = newWidth + 'px';
+        el.style.height = newHeight + 'px';
+      } else {
+        // 文本元素缩放
+        if (dir.length === 2) {
+          // 角落缩放：用对角线距离比例缩放字号 + 宽度
+          var startDiag = Math.sqrt(startWidth * startWidth + startHeight * startHeight);
+          var newDiag = Math.sqrt(newWidth * newWidth + newHeight * newHeight);
+          var diagScale = newDiag / startDiag;
+          var newFontSize = Math.max(8, Math.round(startFontSize * diagScale));
+          el.style.fontSize = newFontSize + 'px';
+          el.style.width = Math.max(30, Math.round(startWidth * diagScale)) + 'px';
+        } else {
+          // 边缘缩放（n/s/e/w）：只改宽度
+          if (dir.indexOf('e') >= 0 || dir.indexOf('w') >= 0) {
+            el.style.width = newWidth + 'px';
+          }
+          // n/s 边缘对文本：按纵向比例缩放字号
+          if (dir === 'n' || dir === 's') {
+            var vScale = newHeight / startHeight;
+            var newFontSize = Math.max(8, Math.round(startFontSize * vScale));
+            el.style.fontSize = newFontSize + 'px';
+          }
+        }
+      }
+
+      // 左/上方向缩放时调整位置
+      if (dir.indexOf('w') >= 0) {
+        ensureRelative(el);
+        el.style.left = (startLeft + (startWidth - newWidth)) + 'px';
+      }
+      if (dir.indexOf('n') >= 0) {
+        ensureRelative(el);
+        el.style.top = (startTop + (startHeight - newHeight)) + 'px';
+      }
+
+      updateHighlight(el);
+    }
+
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.userSelect = '';
+      isResizing = false;
+
+      if (wasEditable && el.tagName !== 'IMG') {
+        el.contentEditable = 'true';
+        el.style.caretColor = '#000';
+      }
+
+      window.parent.postMessage({ type: 'editor-element-resized', info: getElementInfo(el) }, '*');
+    }
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
+
+  // --- 事件监听 ---
 
   document.addEventListener('keydown', function(e) {
     var active = document.activeElement;
@@ -93,9 +285,29 @@ const runtimeScript = `
     }
   }, true);
 
+  // 高亮框 mousedown：拖拽移动
+  document.addEventListener('mousedown', function(e) {
+    if (!highlightEl || !currentSelected) return;
+    if (e.target === highlightEl) {
+      startDragMove(e);
+      return;
+    }
+    // resize 手柄 mousedown
+    if (e.target.hasAttribute && e.target.hasAttribute('data-resize-handle')) {
+      var dir = e.target.getAttribute('data-resize-handle');
+      startResize(e, dir);
+      return;
+    }
+  }, true);
+
   document.addEventListener('click', function(e) {
+    // 拖拽/缩放进行中不处理点击
+    if (isDragging || isResizing) return;
     var el = e.target;
+    // 忽略高亮框和 resize 手柄的点击
     if (el === highlightEl) return;
+    if (el.hasAttribute && el.hasAttribute('data-resize-handle')) return;
+
     var clickedSlide = el.closest ? el.closest('.slide') : null;
     var target = el;
     while (target && target.parentElement && !target.parentElement.classList.contains('slide') && target.tagName !== 'IMG' && target.tagName !== 'H1' && target.tagName !== 'H2' && target.tagName !== 'H3' && target.tagName !== 'P' && target.tagName !== 'SPAN' && target.tagName !== 'LI' && target.tagName !== 'A') {
@@ -122,11 +334,13 @@ const runtimeScript = `
   }, true);
 
   document.addEventListener('dblclick', function(e) {
+    if (isDragging || isResizing) return;
     var el = e.target;
     if (el.classList.contains('slide') || el === highlightEl) {
       e.preventDefault();
       return;
     }
+    if (el.hasAttribute && el.hasAttribute('data-resize-handle')) return;
     while (el && el.parentElement && !el.parentElement.classList.contains('slide') && el.tagName !== 'IMG' && el.tagName !== 'H1' && el.tagName !== 'H2' && el.tagName !== 'H3' && el.tagName !== 'P' && el.tagName !== 'SPAN' && el.tagName !== 'LI' && el.tagName !== 'A') {
       el = el.parentElement;
     }
@@ -148,6 +362,7 @@ const runtimeScript = `
   }, true);
 
   document.addEventListener('focusout', function() {
+    if (isDragging || isResizing) return;
     if (currentSelected && currentSelected.contentEditable === 'true') {
       currentSelected.contentEditable = 'false';
       currentSelected.style.caretColor = '';
@@ -178,6 +393,20 @@ const runtimeScript = `
         var target = activeSlide ? activeSlide.querySelector(path) : document.querySelector(path);
         if (target) {
           Object.keys(props).forEach(function(k) { target.style[k] = props[k]; });
+          updateHighlight(target);
+          window.parent.postMessage({ type: 'editor-content-changed', info: getElementInfo(target) }, '*');
+        }
+      } catch(err) {}
+    }
+    if (e.data && e.data.type === 'editor-position-update') {
+      var path = e.data.cssPath;
+      try {
+        var activeSlide = document.querySelector('.slide.is-active');
+        var target = activeSlide ? activeSlide.querySelector(path) : document.querySelector(path);
+        if (target) {
+          target.style.position = 'relative';
+          target.style.left = e.data.left;
+          target.style.top = e.data.top;
           updateHighlight(target);
           window.parent.postMessage({ type: 'editor-content-changed', info: getElementInfo(target) }, '*');
         }
@@ -310,6 +539,11 @@ export function EditorCanvas() {
         setSelectedElement(null);
       }
       if (e.data?.type === 'editor-content-changed') {
+        syncFromIframe();
+        lastWrittenHtmlRef.current = useEditorStore.getState().deckHtml;
+      }
+      if (e.data?.type === 'editor-element-moved' || e.data?.type === 'editor-element-resized') {
+        setSelectedElement(e.data.info);
         syncFromIframe();
         lastWrittenHtmlRef.current = useEditorStore.getState().deckHtml;
       }

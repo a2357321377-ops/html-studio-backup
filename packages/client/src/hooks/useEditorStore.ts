@@ -11,6 +11,8 @@ export function cleanEditorArtifacts(html: string): string {
   const doc = parser.parseFromString(html, 'text/html');
   // 移除高亮框
   doc.querySelectorAll('[data-editor-highlight]').forEach(el => el.remove());
+  // 移除 resize 手柄
+  doc.querySelectorAll('[data-resize-handle]').forEach(el => el.remove());
   // 移除编辑 runtime script
   doc.querySelectorAll('[data-editor-runtime]').forEach(el => el.remove());
   // 移除 contenteditable 属性（编辑器可能给元素添加了此属性）
@@ -35,6 +37,12 @@ export interface SelectedElement {
   // 是否为图片元素
   isImage: boolean;
   imageSrc: string;
+  // 位置和尺寸（拖拽移动/缩放后同步）
+  position: string;
+  left: string;
+  top: string;
+  width: string;
+  height: string;
 }
 
 const MAX_UNDO_SIZE = 50;

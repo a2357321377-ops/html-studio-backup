@@ -88,6 +88,29 @@ export function StyleTab() {
     reader.readAsDataURL(file);
   };
 
+  // 位置更新（left/top）
+  const handlePositionChange = (axis: 'left' | 'top', value: string) => {
+    if (!selectedElement) return;
+    iframeRef?.contentWindow?.postMessage({
+      type: 'editor-position-update',
+      cssPath: selectedElement.cssPath,
+      left: axis === 'left' ? value : selectedElement.left,
+      top: axis === 'top' ? value : selectedElement.top,
+    }, '*');
+    if (selectedElement) {
+      setSelectedElement({ ...selectedElement, [axis]: value });
+    }
+  };
+
+  // 尺寸更新（width/height）
+  const handleSizeChange = (dim: 'width' | 'height', value: string) => {
+    if (!selectedElement) return;
+    updateStyle({ [dim]: value });
+    if (selectedElement) {
+      setSelectedElement({ ...selectedElement, [dim]: value });
+    }
+  };
+
   if (!selectedElement) {
     return (
       <div className="p-4 text-[var(--color-text-dim2)] text-xs text-center">
@@ -102,6 +125,58 @@ export function StyleTab() {
       <div className="text-[11px] text-[var(--color-text-dim)]">
         选中：{selectedElement.tagName.toLowerCase()}
         {selectedElement.isImage ? ' (图片)' : ''}
+      </div>
+
+      {/* 位置 */}
+      <div className="space-y-1.5">
+        <label className="text-[11px] text-[var(--color-text-dim)]">位置 (X, Y)</label>
+        <div className="flex gap-2">
+          <div className="flex-1 flex items-center gap-1">
+            <span className="text-[10px] text-[var(--color-text-dim2)]">X</span>
+            <input
+              type="number"
+              value={parseFloat(selectedElement.left) || 0}
+              onChange={(e) => handlePositionChange('left', e.target.value + 'px')}
+              className="w-full px-2 py-1 rounded bg-[var(--color-surface-2)] border border-[var(--color-border)] text-[11px] text-[var(--color-text)] font-mono"
+            />
+          </div>
+          <div className="flex-1 flex items-center gap-1">
+            <span className="text-[10px] text-[var(--color-text-dim2)]">Y</span>
+            <input
+              type="number"
+              value={parseFloat(selectedElement.top) || 0}
+              onChange={(e) => handlePositionChange('top', e.target.value + 'px')}
+              className="w-full px-2 py-1 rounded bg-[var(--color-surface-2)] border border-[var(--color-border)] text-[11px] text-[var(--color-text)] font-mono"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 尺寸 */}
+      <div className="space-y-1.5">
+        <label className="text-[11px] text-[var(--color-text-dim)]">尺寸 (W, H)</label>
+        <div className="flex gap-2">
+          <div className="flex-1 flex items-center gap-1">
+            <span className="text-[10px] text-[var(--color-text-dim2)]">W</span>
+            <input
+              type="number"
+              value={parseFloat(selectedElement.width) || ''}
+              placeholder="auto"
+              onChange={(e) => handleSizeChange('width', e.target.value ? e.target.value + 'px' : '')}
+              className="w-full px-2 py-1 rounded bg-[var(--color-surface-2)] border border-[var(--color-border)] text-[11px] text-[var(--color-text)] font-mono"
+            />
+          </div>
+          <div className="flex-1 flex items-center gap-1">
+            <span className="text-[10px] text-[var(--color-text-dim2)]">H</span>
+            <input
+              type="number"
+              value={parseFloat(selectedElement.height) || ''}
+              placeholder="auto"
+              onChange={(e) => handleSizeChange('height', e.target.value ? e.target.value + 'px' : '')}
+              className="w-full px-2 py-1 rounded bg-[var(--color-surface-2)] border border-[var(--color-border)] text-[11px] text-[var(--color-text)] font-mono"
+            />
+          </div>
+        </div>
       </div>
 
       {/* 文字颜色 */}
