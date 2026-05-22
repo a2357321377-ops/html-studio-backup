@@ -1,9 +1,0 @@
-{"type":"server-started","port":61880,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:61880","screen_dir":"/Users/queota/CCworkspace/html-studio/.superpowers/brainstorm/74512-1778756713/content","state_dir":"/Users/queota/CCworkspace/html-studio/.superpowers/brainstorm/74512-1778756713/state"}
-{"type":"screen-added","file":"/Users/queota/CCworkspace/html-studio/.superpowers/brainstorm/74512-1778756713/content/architecture.html"}
-{"source":"user-event","type":"click","text":"C\n    \n      Monorepo 全栈 — Vite + Hono\n      Turborepo monorepo，Vite React 前端 + Hono 轻量后端，共享类型定义，现代工具链","choice":"c","id":null,"timestamp":1778757392367}
-{"type":"screen-added","file":"/Users/queota/CCworkspace/html-studio/.superpowers/brainstorm/74512-1778756713/content/architecture-detail.html"}
-{"type":"screen-added","file":"/Users/queota/CCworkspace/html-studio/.superpowers/brainstorm/74512-1778756713/content/editor-ui.html"}
-{"type":"screen-added","file":"/Users/queota/CCworkspace/html-studio/.superpowers/brainstorm/74512-1778756713/content/home-page.html"}
-{"type":"screen-added","file":"/Users/queota/CCworkspace/html-studio/.superpowers/brainstorm/74512-1778756713/content/theme-picker.html"}
-{"type":"screen-added","file":"/Users/queota/CCworkspace/html-studio/.superpowers/brainstorm/74512-1778756713/content/editor-interactions.html"}
-{"type":"server-stopped","reason":"idle timeout"}
