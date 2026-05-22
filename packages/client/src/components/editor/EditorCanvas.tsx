@@ -202,6 +202,12 @@ export function EditorCanvas() {
               }
               currentSelected = target;
               updateHighlight(target);
+              // 文字元素单击即进入编辑模式，显示光标
+              if (target.tagName !== 'IMG') {
+                target.contentEditable = 'true';
+                target.style.caretColor = '#000';
+                target.focus();
+              }
               window.parent.postMessage({ type: 'editor-element-selected', info: getElementInfo(target) }, '*');
             }, true);
 
@@ -222,9 +228,7 @@ export function EditorCanvas() {
               e.stopPropagation();
               currentSelected = el;
               el.contentEditable = 'true';
-              // 设置光标颜色为当前文字颜色，确保在暗色背景上也能看到光标
-              var textColor = window.getComputedStyle(el).color;
-              el.style.caretColor = textColor;
+              el.style.caretColor = '#000';
               el.focus();
               // 选中全部文字
               var range = document.createRange();
@@ -253,6 +257,17 @@ export function EditorCanvas() {
                   s.classList.toggle('is-active', i === idx);
                   s.classList.toggle('is-prev', i < idx);
                 });
+                // 翻页时清除选中状态，避免选择框遗留到下一页
+                if (currentSelected) {
+                  if (currentSelected.contentEditable === 'true') {
+                    currentSelected.contentEditable = 'false';
+                    currentSelected.style.caretColor = '';
+                    window.parent.postMessage({ type: 'editor-content-changed', info: getElementInfo(currentSelected) }, '*');
+                  }
+                  currentSelected = null;
+                }
+                updateHighlight(null);
+                window.parent.postMessage({ type: 'editor-element-deselected' }, '*');
               }
               if (e.data && e.data.type === 'editor-style-update') {
                 var path = e.data.cssPath;
