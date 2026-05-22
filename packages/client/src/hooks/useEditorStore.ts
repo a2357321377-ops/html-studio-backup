@@ -37,6 +37,8 @@ export interface SelectedElement {
   imageSrc: string;
 }
 
+const MAX_UNDO_SIZE = 50;
+
 interface EditorState {
   // 当前编辑的 HTML（从 useAIChat.deckHtml 初始化）
   deckHtml: string;
@@ -69,13 +71,25 @@ interface EditorState {
   // 用于预览、演讲者模式、导出等非编辑场景
   getCleanHtml: () => string;
 
+  // 撤销/重做
+  undoStack: string[];
+  redoStack: string[];
+  canUndo: boolean;
+  canRedo: boolean;
+  undo: () => void;
+  redo: () => void;
+
   // 重置
   reset: () => void;
 }
 
 export const useEditorStore = create<EditorState>()((set, get) => ({
   deckHtml: '',
-  setDeckHtml: (html) => set({ deckHtml: html }),
+  setDeckHtml: (html) => {
+    const prev = get().deckHtml;
+    const undoStack = prev ? [...get().undoStack, prev].slice(-MAX_UNDO_SIZE) : get().undoStack;
+    set({ deckHtml: html, undoStack, redoStack: [], canUndo: undoStack.length > 0, canRedo: false });
+  },
 
   currentSlideIndex: 0,
   setCurrentSlideIndex: (idx) => set({ currentSlideIndex: idx }),
@@ -92,6 +106,47 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
   iframeRef: null,
   setIframeRef: (ref) => set({ iframeRef: ref }),
 
+  undoStack: [],
+  redoStack: [],
+  canUndo: false,
+  canRedo: false,
+
+  undo: () => {
+    const { undoStack, redoStack, deckHtml } = get();
+    if (undoStack.length === 0) return;
+    const prev = undoStack[undoStack.length - 1];
+    const newUndo = undoStack.slice(0, -1);
+    const newRedo = deckHtml ? [...redoStack, deckHtml] : redoStack;
+    set({
+      deckHtml: prev,
+      undoStack: newUndo,
+      redoStack: newRedo,
+      canUndo: newUndo.length > 0,
+      canRedo: newRedo.length > 0,
+      selectedElement: null,
+    });
+    // 延迟同步到 AI store，避免触发额外的重渲染
+    requestAnimationFrame(() => useAIChat.getState().setDeckHtml(prev));
+  },
+
+  redo: () => {
+    const { undoStack, redoStack, deckHtml } = get();
+    if (redoStack.length === 0) return;
+    const next = redoStack[redoStack.length - 1];
+    const newRedo = redoStack.slice(0, -1);
+    const newUndo = deckHtml ? [...undoStack, deckHtml] : undoStack;
+    set({
+      deckHtml: next,
+      undoStack: newUndo,
+      redoStack: newRedo,
+      canUndo: newUndo.length > 0,
+      canRedo: newRedo.length > 0,
+      selectedElement: null,
+    });
+    // 延迟同步到 AI store，避免触发额外的重渲染
+    requestAnimationFrame(() => useAIChat.getState().setDeckHtml(next));
+  },
+
   syncFromIframe: () => {
     const iframe = get().iframeRef;
     if (!iframe?.contentDocument) return;
@@ -101,10 +156,20 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     const rawHtml = doc.documentElement.outerHTML;
     // 用 DOMParser 清理编辑器注入的元素后存入 store
     const cleanHtml = cleanEditorArtifacts(`<!DOCTYPE html>\n${rawHtml}`);
-    set({ deckHtml: cleanHtml });
-    // 同步到 AI store（首页使用 AI store 的 deckHtml，且 persist 到 localStorage）
-    // 确保 localStorage 中始终是干净的 HTML，避免刷新后首页残留编辑器痕迹
-    useAIChat.getState().setDeckHtml(cleanHtml);
+    const prev = get().deckHtml;
+    // 内容没变则不记录历史
+    // 用 DOMParser 重新序列化 prev，确保属性顺序与 cleanHtml 一致后再比较
+    if (prev) {
+      const prevDoc = new DOMParser().parseFromString(prev, 'text/html');
+      const prevNormalized = prevDoc.documentElement.outerHTML;
+      const newDoc = new DOMParser().parseFromString(cleanHtml, 'text/html');
+      const newNormalized = newDoc.documentElement.outerHTML;
+      if (prevNormalized === newNormalized) return;
+    }
+    const undoStack = prev ? [...get().undoStack, prev].slice(-MAX_UNDO_SIZE) : get().undoStack;
+    set({ deckHtml: cleanHtml, undoStack, redoStack: [], canUndo: undoStack.length > 0, canRedo: false });
+    // 延迟同步到 AI store，避免触发额外的重渲染
+    requestAnimationFrame(() => useAIChat.getState().setDeckHtml(cleanHtml));
   },
 
   getCleanHtml: () => {
@@ -119,5 +184,9 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
       selectedElement: null,
       activeTab: 'style',
       iframeRef: null,
+      undoStack: [],
+      redoStack: [],
+      canUndo: false,
+      canRedo: false,
     }),
 }));
