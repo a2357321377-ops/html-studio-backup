@@ -10,13 +10,14 @@ const runtimeScript = `
   var originalContent = null;
   var isDragging = false;
   var isResizing = false;
+  var isEditing = false;
   var DRAG_THRESHOLD = 3;
 
   function getHighlight(doc) {
     if (!highlightEl) {
       highlightEl = doc.createElement('div');
       highlightEl.setAttribute('data-editor-highlight', '1');
-      highlightEl.style.cssText = 'position:absolute;pointer-events:none;border:2px solid #3b6cff;border-radius:4px;z-index:9999;';
+      highlightEl.style.cssText = 'position:absolute;pointer-events:auto;border:2px solid #3b6cff;border-radius:4px;z-index:9999;display:none;cursor:move;';
       doc.body.appendChild(highlightEl);
 
       // 8 个 resize 手柄
@@ -49,20 +50,59 @@ const runtimeScript = `
     h.style.top = (rect.top - 2) + 'px';
     h.style.width = (rect.width + 4) + 'px';
     h.style.height = (rect.height + 4) + 'px';
-    // 选中元素时允许高亮框交互（拖拽移动）
-    h.style.pointerEvents = 'auto';
-    h.style.cursor = 'move';
+    // 编辑模式：选择框仍显示但不可拖动（PPT 行为）
+    if (isEditing) {
+      h.style.pointerEvents = 'none';
+      h.style.cursor = 'default';
+    } else {
+      h.style.pointerEvents = 'auto';
+      h.style.cursor = 'move';
+    }
+  }
+
+  function enterEditing(el) {
+    if (isEditing && currentSelected === el) return;
+    // 先退出当前编辑
+    if (isEditing && currentSelected) {
+      exitEditing();
+    }
+    originalContent = el.innerHTML;
+    currentSelected = el;
+    el.contentEditable = 'true';
+    el.style.cursor = 'text';
+    isEditing = true;
+    updateHighlight(el);
+    // 延迟 focus，确保 contentEditable 已生效
+    // 直接 focus + selectNodeContents 可能因浏览器尚未准备好而失败
+    requestAnimationFrame(function() {
+      if (!isEditing || currentSelected !== el) return;
+      el.focus();
+    });
+  }
+
+  function exitEditing() {
+    if (!isEditing || !currentSelected) return;
+    currentSelected.contentEditable = 'false';
+    currentSelected.style.cursor = '';
+    // 如果内容变了，通知父页面
+    if (originalContent !== null && currentSelected.innerHTML !== originalContent) {
+      window.parent.postMessage({ type: 'editor-content-changed', info: getElementInfo(currentSelected) }, '*');
+    }
+    originalContent = null;
+    isEditing = false;
+    updateHighlight(currentSelected);
   }
 
   function deselectCurrent() {
-    if (currentSelected && currentSelected.contentEditable === 'true') {
+    if (isEditing && currentSelected) {
       currentSelected.contentEditable = 'false';
-      currentSelected.style.caretColor = '';
+      currentSelected.style.cursor = '';
       var changed = originalContent !== null && currentSelected.innerHTML !== originalContent;
       if (changed) {
         window.parent.postMessage({ type: 'editor-content-changed', info: getElementInfo(currentSelected) }, '*');
       }
       originalContent = null;
+      isEditing = false;
     }
     currentSelected = null;
     isDragging = false;
@@ -114,13 +154,22 @@ const runtimeScript = `
     };
   }
 
-  // 确保 position: relative，用于拖拽移动
   function ensureRelative(el) {
     if (el.style.position !== 'relative' && el.style.position !== 'absolute') {
       el.style.position = 'relative';
       el.style.left = '0px';
       el.style.top = '0px';
     }
+  }
+
+  // 查找最近的可编辑祖先元素（向上冒泡到 slide 边界）
+  function findEditableTarget(el) {
+    var target = el;
+    while (target && target.parentElement && !target.parentElement.classList.contains('slide') && target.tagName !== 'IMG' && target.tagName !== 'H1' && target.tagName !== 'H2' && target.tagName !== 'H3' && target.tagName !== 'P' && target.tagName !== 'SPAN' && target.tagName !== 'LI' && target.tagName !== 'A') {
+      target = target.parentElement;
+    }
+    var isMeaningful = target && target !== document.body && target !== document.documentElement && !target.classList.contains('slide');
+    return isMeaningful ? target : null;
   }
 
   // --- 拖拽移动 ---
@@ -130,10 +179,8 @@ const runtimeScript = `
     e.stopPropagation();
 
     var el = currentSelected;
-    var wasEditable = el.contentEditable === 'true';
-    if (wasEditable) {
-      el.contentEditable = 'false';
-      el.blur();
+    if (isEditing) {
+      exitEditing();
     }
 
     ensureRelative(el);
@@ -161,11 +208,7 @@ const runtimeScript = `
       document.removeEventListener('mouseup', onUp);
       document.body.style.userSelect = '';
       isDragging = false;
-
-      if (wasEditable && el.tagName !== 'IMG') {
-        el.contentEditable = 'true';
-        el.style.caretColor = '#000';
-      }
+      updateHighlight(el);
 
       if (moved) {
         window.parent.postMessage({ type: 'editor-element-moved', info: getElementInfo(el) }, '*');
@@ -183,10 +226,8 @@ const runtimeScript = `
     e.stopPropagation();
 
     var el = currentSelected;
-    var wasEditable = el.contentEditable === 'true';
-    if (wasEditable) {
-      el.contentEditable = 'false';
-      el.blur();
+    if (isEditing) {
+      exitEditing();
     }
 
     var isImg = el.tagName === 'IMG';
@@ -208,7 +249,6 @@ const runtimeScript = `
       var newWidth = startWidth;
       var newHeight = startHeight;
 
-      // 根据方向计算新尺寸
       if (dir.indexOf('e') >= 0) newWidth = startWidth + dx;
       if (dir.indexOf('w') >= 0) newWidth = startWidth - dx;
       if (dir.indexOf('s') >= 0) newHeight = startHeight + dy;
@@ -218,13 +258,10 @@ const runtimeScript = `
       newHeight = Math.max(20, newHeight);
 
       if (isImg) {
-        // 图片：设置宽高
         el.style.width = newWidth + 'px';
         el.style.height = newHeight + 'px';
       } else {
-        // 文本元素缩放
         if (dir.length === 2) {
-          // 角落缩放：用对角线距离比例缩放字号 + 宽度
           var startDiag = Math.sqrt(startWidth * startWidth + startHeight * startHeight);
           var newDiag = Math.sqrt(newWidth * newWidth + newHeight * newHeight);
           var diagScale = newDiag / startDiag;
@@ -232,11 +269,9 @@ const runtimeScript = `
           el.style.fontSize = newFontSize + 'px';
           el.style.width = Math.max(30, Math.round(startWidth * diagScale)) + 'px';
         } else {
-          // 边缘缩放（n/s/e/w）：只改宽度
           if (dir.indexOf('e') >= 0 || dir.indexOf('w') >= 0) {
             el.style.width = newWidth + 'px';
           }
-          // n/s 边缘对文本：按纵向比例缩放字号
           if (dir === 'n' || dir === 's') {
             var vScale = newHeight / startHeight;
             var newFontSize = Math.max(8, Math.round(startFontSize * vScale));
@@ -245,7 +280,6 @@ const runtimeScript = `
         }
       }
 
-      // 左/上方向缩放时调整位置
       if (dir.indexOf('w') >= 0) {
         ensureRelative(el);
         el.style.left = (startLeft + (startWidth - newWidth)) + 'px';
@@ -263,11 +297,7 @@ const runtimeScript = `
       document.removeEventListener('mouseup', onUp);
       document.body.style.userSelect = '';
       isResizing = false;
-
-      if (wasEditable && el.tagName !== 'IMG') {
-        el.contentEditable = 'true';
-        el.style.caretColor = '#000';
-      }
+      updateHighlight(el);
 
       window.parent.postMessage({ type: 'editor-element-resized', info: getElementInfo(el) }, '*');
     }
@@ -278,21 +308,54 @@ const runtimeScript = `
 
   // --- 事件监听 ---
 
+  // 键盘：编辑模式下拦截导航键，ESC 退出编辑 → 取消选中
   document.addEventListener('keydown', function(e) {
-    var active = document.activeElement;
-    if (active && active.contentEditable === 'true') {
+    // 编辑模式：左右键/上下键/空格/PageUp/PageDn/Home/End 用于移动光标，不翻页
+    if (isEditing && currentSelected && currentSelected.contentEditable === 'true') {
+      var navKeys = ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown',' '];
+      if (navKeys.indexOf(e.key) >= 0) {
+        e.stopPropagation(); // 阻止 runtime.js 翻页
+        return; // 让浏览器默认行为（移动光标）正常执行
+      }
+      // Enter 在编辑模式下也不翻页
+      if (e.key === 'Enter') {
+        e.stopPropagation();
+        return;
+      }
+    }
+    // ESC：退出编辑 → 取消选中
+    if (e.key === 'Escape') {
+      e.preventDefault();
       e.stopPropagation();
+      if (isEditing) {
+        exitEditing();
+      } else if (currentSelected) {
+        deselectCurrent();
+        window.parent.postMessage({ type: 'editor-element-deselected' }, '*');
+      }
+      return;
+    }
+    // 选中但未编辑时：左右键也不应该翻页（PPT行为）
+    if (currentSelected && !isEditing) {
+      var preventNavKeys = ['ArrowLeft','ArrowRight',' '];
+      if (preventNavKeys.indexOf(e.key) >= 0) {
+        e.stopPropagation();
+        return;
+      }
     }
   }, true);
 
-  // 高亮框 mousedown：拖拽移动
+  // mousedown：选择框拖拽 / resize 手柄 / 选中元素
   document.addEventListener('mousedown', function(e) {
-    if (!highlightEl || !currentSelected) return;
+    if (!currentSelected) return;
+    if (isDragging || isResizing) return;
+
+    // 选择框拖拽
     if (e.target === highlightEl) {
       startDragMove(e);
       return;
     }
-    // resize 手柄 mousedown
+    // resize 手柄
     if (e.target.hasAttribute && e.target.hasAttribute('data-resize-handle')) {
       var dir = e.target.getAttribute('data-resize-handle');
       startResize(e, dir);
@@ -300,89 +363,111 @@ const runtimeScript = `
     }
   }, true);
 
+  // click：选中元素（PPT 行为 — 单击选中，不进入编辑）
   document.addEventListener('click', function(e) {
-    // 拖拽/缩放进行中不处理点击
     if (isDragging || isResizing) return;
     var el = e.target;
-    // 忽略高亮框和 resize 手柄的点击
+    // 忽略选择框和 resize 手柄
     if (el === highlightEl) return;
     if (el.hasAttribute && el.hasAttribute('data-resize-handle')) return;
 
-    var clickedSlide = el.closest ? el.closest('.slide') : null;
-    var target = el;
-    while (target && target.parentElement && !target.parentElement.classList.contains('slide') && target.tagName !== 'IMG' && target.tagName !== 'H1' && target.tagName !== 'H2' && target.tagName !== 'H3' && target.tagName !== 'P' && target.tagName !== 'SPAN' && target.tagName !== 'LI' && target.tagName !== 'A') {
-      target = target.parentElement;
+    // 如果正在编辑，点击编辑区域外退出编辑
+    if (isEditing && currentSelected) {
+      // 点击当前编辑元素内部：不处理（让 contentEditable 正常工作）
+      if (el === currentSelected || currentSelected.contains(el)) return;
+      // 点击其他位置：退出编辑
+      exitEditing();
     }
-    var isMeaningful = target && target !== document.body && target !== document.documentElement && !target.classList.contains('slide');
-    if (!isMeaningful) {
+
+    // 查找可编辑目标
+    var target = findEditableTarget(el);
+    if (!target) {
+      // 点击空白区域：取消选中
       deselectCurrent();
       window.parent.postMessage({ type: 'editor-element-deselected' }, '*');
       return;
     }
+
     e.preventDefault();
     e.stopPropagation();
+
+    // 如果点击的是已选中元素，不重复选中
+    if (currentSelected === target) return;
+
+    // 选中新元素（单击只选中，不进入编辑）
     deselectCurrent();
     currentSelected = target;
     updateHighlight(target);
-    if (target.tagName !== 'IMG') {
-      originalContent = target.innerHTML;
-      target.contentEditable = 'true';
-      target.style.caretColor = '#000';
-      target.focus();
-    }
     window.parent.postMessage({ type: 'editor-element-selected', info: getElementInfo(target) }, '*');
   }, true);
 
+  // dblclick：进入文字编辑模式
   document.addEventListener('dblclick', function(e) {
     if (isDragging || isResizing) return;
     var el = e.target;
-    if (el.classList.contains('slide') || el === highlightEl) {
-      e.preventDefault();
-      return;
-    }
+    if (el === highlightEl) return;
     if (el.hasAttribute && el.hasAttribute('data-resize-handle')) return;
-    while (el && el.parentElement && !el.parentElement.classList.contains('slide') && el.tagName !== 'IMG' && el.tagName !== 'H1' && el.tagName !== 'H2' && el.tagName !== 'H3' && el.tagName !== 'P' && el.tagName !== 'SPAN' && el.tagName !== 'LI' && el.tagName !== 'A') {
-      el = el.parentElement;
-    }
-    if (el.tagName === 'IMG') return;
-    if (el === document.body || el === document.documentElement || el.classList.contains('slide')) return;
+
+    var target = findEditableTarget(el);
+    if (!target) return;
+    // 图片不支持文字编辑
+    if (target.tagName === 'IMG') return;
+
     e.preventDefault();
     e.stopPropagation();
-    deselectCurrent();
-    currentSelected = el;
-    originalContent = el.innerHTML;
-    el.contentEditable = 'true';
-    el.style.caretColor = '#000';
-    el.focus();
-    var range = document.createRange();
-    range.selectNodeContents(el);
-    var sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }, true);
 
-  document.addEventListener('focusout', function() {
-    if (isDragging || isResizing) return;
-    if (currentSelected && currentSelected.contentEditable === 'true') {
-      currentSelected.contentEditable = 'false';
-      currentSelected.style.caretColor = '';
-      var changed = originalContent !== null && currentSelected.innerHTML !== originalContent;
-      if (changed) {
-        window.parent.postMessage({ type: 'editor-content-changed', info: getElementInfo(currentSelected) }, '*');
-      }
-      originalContent = null;
+    // 选中并进入编辑
+    if (currentSelected !== target) {
+      deselectCurrent();
+      currentSelected = target;
     }
+    enterEditing(target);
+    // 选中全部文字延迟到下一帧，确保 contentEditable + focus 已生效
+    requestAnimationFrame(function() {
+      if (!isEditing || currentSelected !== target) return;
+      var range = document.createRange();
+      range.selectNodeContents(target);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    });
+    window.parent.postMessage({ type: 'editor-element-selected', info: getElementInfo(target) }, '*');
   }, true);
 
+  // focusout：编辑失焦时退出编辑（用延迟避免双击进入编辑后立即触发）
+  document.addEventListener('focusout', function(e) {
+    if (isDragging || isResizing) return;
+    if (!isEditing || !currentSelected) return;
+    // 延迟检查：如果 focusout 后 focus 又回到了当前编辑元素，则不退出
+    setTimeout(function() {
+      if (!isEditing || !currentSelected) return;
+      var active = document.activeElement;
+      // 焦点还在当前编辑元素或其子元素内：不退出
+      if (active && (active === currentSelected || currentSelected.contains(active))) return;
+      exitEditing();
+    }, 50);
+  }, true);
+
+  // postMessage 通信
   window.addEventListener('message', function(e) {
     if (e.data && e.data.type === 'editor-goto') {
       var idx = e.data.idx;
+      // 翻页：清除选中/编辑状态（不触发 content-changed）
+      if (isEditing && currentSelected) {
+        currentSelected.contentEditable = 'false';
+        currentSelected.style.cursor = '';
+        originalContent = null;
+        isEditing = false;
+      }
+      currentSelected = null;
+      isDragging = false;
+      isResizing = false;
+      updateHighlight(null);
       var slides = document.querySelectorAll('.slide');
       slides.forEach(function(s, i) {
         s.classList.toggle('is-active', i === idx);
         s.classList.toggle('is-prev', i < idx);
       });
-      deselectCurrent();
       window.parent.postMessage({ type: 'editor-element-deselected' }, '*');
     }
     if (e.data && e.data.type === 'editor-style-update') {
@@ -466,9 +551,12 @@ export function EditorCanvas() {
   const syncFromIframe = useEditorStore((s) => s.syncFromIframe);
   const [scale, setScale] = useState(1);
 
+  // iframeSrcDoc 始终跟踪 deckHtml
+  // 每次 deckHtml 外部变化时，更新 srcDoc + bump key，让 iframe 从头重新加载
+  // 这比 DOM 替换更可靠，避免了各种 contentDocument 时序问题
   const [iframeKey, setIframeKey] = useState(0);
-  const [iframeSrcDoc, setIframeSrcDoc] = useState(deckHtml);
-  const lastWrittenHtmlRef = useRef<string>(deckHtml || '');
+  const [iframeSrcDoc, setIframeSrcDoc] = useState('');
+  const lastExternalHtmlRef = useRef<string>(''); // 记录最后一次外部传入的 deckHtml
 
   // 计算 iframe 缩放
   const updateScale = useCallback(() => {
@@ -489,32 +577,58 @@ export function EditorCanvas() {
     return () => observer.disconnect();
   }, [updateScale]);
 
-  // 注册 iframe ref 到 store
-  useEffect(() => {
-    if (iframeRef.current) {
-      setIframeRef(iframeRef.current);
-    }
-  }, [setIframeRef, iframeKey]);
-
   // 注入 runtime 到 iframe
   const injectRuntime = useCallback((doc: Document) => {
+    // 如果已有 runtime script，说明已经注入过了，跳过
+    const existingRuntime = doc.querySelector('script[data-editor-runtime]');
+    if (existingRuntime) return;
+
     const slides = doc.querySelectorAll('.slide');
     setTotalSlides(slides.length);
+    const idx = useEditorStore.getState().currentSlideIndex;
     slides.forEach((s, i) => {
-      s.classList.toggle('is-active', i === currentSlideIndex);
-      s.classList.toggle('is-prev', i < currentSlideIndex);
+      s.classList.toggle('is-active', i === idx);
+      s.classList.toggle('is-prev', i < idx);
     });
     const script = doc.createElement('script');
     script.setAttribute('data-editor-runtime', '1');
     script.textContent = runtimeScript;
     doc.body.appendChild(script);
-  }, [currentSlideIndex, setTotalSlides]);
+  }, [setTotalSlides]);
 
-  // iframe 加载后：注入编辑 runtime + 设置当前页
-  useEffect(() => {
+  // 当 deckHtml 从外部变化时（初始化、undo/redo、AI 同步），重新加载 iframe
+  useLayoutEffect(() => {
+    if (!deckHtml) return;
+    // 区分外部更新和 syncFromIframe 回写：
+    // syncFromIframe 更新 deckHtml 后，lastExternalHtmlRef 已经被同步更新了，
+    // 所以不会触发重复加载
+    if (deckHtml !== lastExternalHtmlRef.current) {
+      lastExternalHtmlRef.current = deckHtml;
+      setIframeSrcDoc(deckHtml);
+      setIframeKey((k) => k + 1);
+    }
+  }, [deckHtml]);
+
+  // 注册 iframe ref 到 store + 注入 runtime
+  // 使用 useLayoutEffect 确保 load 事件监听在浏览器绘制前注册
+  useLayoutEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
 
+    // 注册 ref
+    setIframeRef(iframe);
+
+    // 尝试立即注入 runtime（iframe 可能已加载完毕）
+    try {
+      const doc = iframe.contentDocument;
+      if (doc && doc.querySelector('.slide') && !doc.querySelector('script[data-editor-runtime]')) {
+        injectRuntime(doc);
+      }
+    } catch {
+      // cross-origin
+    }
+
+    // 注册 load 事件，确保 runtime 被注入
     const handleLoad = () => {
       try {
         const doc = iframe.contentDocument;
@@ -526,8 +640,11 @@ export function EditorCanvas() {
     };
 
     iframe.addEventListener('load', handleLoad);
-    return () => iframe.removeEventListener('load', handleLoad);
-  }, [injectRuntime, iframeKey]);
+    return () => {
+      iframe.removeEventListener('load', handleLoad);
+      setIframeRef(null);
+    };
+  }, [setIframeRef, injectRuntime, iframeKey]);
 
   // 监听 iframe postMessage
   useEffect(() => {
@@ -537,61 +654,25 @@ export function EditorCanvas() {
       }
       if (e.data?.type === 'editor-element-deselected') {
         setSelectedElement(null);
+        // 取消选择时也同步 HTML，确保编辑内容反映到缩略图
+        syncFromIframe();
+        lastExternalHtmlRef.current = useEditorStore.getState().deckHtml;
       }
       if (e.data?.type === 'editor-content-changed') {
         syncFromIframe();
-        lastWrittenHtmlRef.current = useEditorStore.getState().deckHtml;
+        // syncFromIframe 更新了 deckHtml，需要更新 lastExternalHtmlRef
+        // 防止 useLayoutEffect 以为这是外部变化而重新加载 iframe
+        lastExternalHtmlRef.current = useEditorStore.getState().deckHtml;
       }
       if (e.data?.type === 'editor-element-moved' || e.data?.type === 'editor-element-resized') {
         setSelectedElement(e.data.info);
         syncFromIframe();
-        lastWrittenHtmlRef.current = useEditorStore.getState().deckHtml;
+        lastExternalHtmlRef.current = useEditorStore.getState().deckHtml;
       }
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [setSelectedElement, syncFromIframe]);
-
-  // deckHtml 变化时更新 iframe
-  // 用 useLayoutEffect 在浏览器绘制前同步执行，避免闪烁
-  useLayoutEffect(() => {
-    if (!deckHtml) return;
-    if (deckHtml !== lastWrittenHtmlRef.current) {
-      const iframe = iframeRef.current;
-      if (iframe?.contentDocument) {
-        try {
-          const doc = iframe.contentDocument;
-          const parser = new DOMParser();
-          const newDoc = parser.parseFromString(deckHtml, 'text/html');
-          // 替换 head 内容（样式表等）
-          const oldHead = doc.head;
-          const newHead = doc.adoptNode(newDoc.head);
-          const newHeadChildren = Array.from(newHead.childNodes);
-          while (oldHead.firstChild) oldHead.removeChild(oldHead.firstChild);
-          newHeadChildren.forEach(node => oldHead.appendChild(node));
-          // 替换 body 内容
-          const oldBody = doc.body;
-          const newBody = doc.adoptNode(newDoc.body);
-          const newBodyChildren = Array.from(newBody.childNodes);
-          while (oldBody.firstChild) oldBody.removeChild(oldBody.firstChild);
-          newBodyChildren.forEach(node => oldBody.appendChild(node));
-          // 复制 body 属性
-          oldBody.className = newBody.className;
-          Array.from(newBody.attributes).forEach(attr => {
-            if (attr.name !== 'class') oldBody.setAttribute(attr.name, attr.value);
-          });
-          lastWrittenHtmlRef.current = deckHtml;
-          injectRuntime(doc);
-          return;
-        } catch {
-          // fallback to full reload
-        }
-      }
-      lastWrittenHtmlRef.current = deckHtml;
-      setIframeSrcDoc(deckHtml);
-      setIframeKey((k) => k + 1);
-    }
-  }, [deckHtml, injectRuntime]);
 
   // 组件卸载时：同步清理后的 HTML 回 store
   useEffect(() => {

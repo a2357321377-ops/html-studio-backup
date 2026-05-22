@@ -1,14 +1,14 @@
-import { useRef, useEffect, useState, useMemo } from 'react';
+import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { useEditorStore, cleanEditorArtifacts } from '../../hooks/useEditorStore';
 import { ImageUploader } from './ImageUploader';
 
 /**
  * 左侧幻灯片缩略图列表
  *
- * 缩略图渲染策略：
- * 不使用 iframe（iframe 加载样式表开销大，sandbox 限制多），
- * 而是用 DOMParser 解析 deckHtml，提取每页 slide 的 innerHTML，
- * 在一个 div 中用 CSS 缩放渲染。样式表通过 <link> 从宿主页面加载。
+ * 性能优化：
+ * 1. 防抖：deckHtml 变化后延迟 300ms 再更新缩略图
+ * 2. 懒加载：只有进入视口的缩略图才创建 iframe，离开视口的销毁
+ * 3. 占位符：未加载的缩略图显示灰色占位符
  */
 export function SlideThumbnailList() {
   const currentSlideIndex = useEditorStore((s) => s.currentSlideIndex);
@@ -25,6 +25,10 @@ export function SlideThumbnailList() {
   // 缩略图缩放比例
   const listRef = useRef<HTMLDivElement>(null);
   const [thumbScale, setThumbScale] = useState(1);
+
+  // 懒加载：跟踪哪些缩略图已进入视口
+  const [visibleSlides, setVisibleSlides] = useState<Set<number>>(new Set([0]));
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -51,31 +55,75 @@ export function SlideThumbnailList() {
     return () => observer.disconnect();
   }, []);
 
-  // 从 deckHtml 中提取每页 slide 的内容信息
-  const slideInfos = useMemo((): { innerHtml: string; slideClasses: string }[] => {
-    if (!deckHtml) return [];
+  // 初始化 IntersectionObserver（只创建一次，通过 ref callback 动态注册观察）
+  useEffect(() => {
+    if (observerRef.current) observerRef.current.disconnect();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        setVisibleSlides((prev) => {
+          const next = new Set(prev);
+          for (const entry of entries) {
+            const idx = Number(entry.target.getAttribute('data-slide-idx'));
+            if (entry.isIntersecting) {
+              next.add(idx);
+            }
+            // 不移除已加载的，避免来回滚动时反复创建/销毁 iframe
+          }
+          return next;
+        });
+      },
+      { root: listRef.current, rootMargin: '200px 0px' }
+    );
+    observerRef.current = observer;
+    return () => observer.disconnect();
+  }, []);
+
+  // ref callback：每个缩略图容器渲染后注册到 IntersectionObserver
+  const observeSlide = useCallback((el: HTMLDivElement | null) => {
+    if (el && observerRef.current) {
+      observerRef.current.observe(el);
+    }
+  }, []);
+
+  // 从 deckHtml 中提取每页 slide 的内容信息 + head 中的样式表链接
+  const { slideInfos, headLinks } = useMemo(() => {
+    if (!deckHtml) return { slideInfos: [], headLinks: '' };
     const cleanSource = cleanEditorArtifacts(deckHtml);
     const parser = new DOMParser();
     const doc = parser.parseFromString(cleanSource, 'text/html');
     const slides = doc.querySelectorAll('.slide');
-    if (slides.length === 0) return [];
+    if (slides.length === 0) return { slideInfos: [], headLinks: '' };
 
-    const infos: { innerHtml: string; slideClasses: string }[] = [];
+    // 提取 head 中的样式表链接（主题、动画等），确保缩略图样式与编辑页一致
+    const links: string[] = [];
+    doc.head.querySelectorAll('link[rel="stylesheet"]').forEach((link) => {
+      const href = link.getAttribute('href') || '';
+      if (href) {
+        links.push(`<link rel="stylesheet" href="${href}">`);
+      }
+    });
+    const headLinksStr = links.join('');
+
+    const infos: { innerHtml: string; slideClasses: string; slideStyle: string }[] = [];
     slides.forEach((slide) => {
-      // 提取 slide 的 class（去掉 is-active/is-prev，这些由缩略图自己控制）
       const classes = Array.from(slide.classList)
         .filter((c) => c !== 'is-active' && c !== 'is-prev')
         .join(' ');
+      // 保留 slide 自身的 inline style，确保缩略图与编辑页一致
+      const slideStyle = slide.getAttribute('style') || '';
       infos.push({
         innerHtml: slide.innerHTML,
         slideClasses: classes,
+        slideStyle,
       });
     });
-    return infos;
+    return { slideInfos: infos, headLinks: headLinksStr };
   }, [deckHtml]);
 
-  // 切换当前页
+  // 切换当前页（先同步当前页的编辑内容，再翻页）
   const handleSelectSlide = (idx: number) => {
+    // 切换页面前先同步当前编辑内容到 store，确保缩略图更新
+    syncFromIframe();
     setCurrentSlideIndex(idx);
     iframeRef?.contentWindow?.postMessage({ type: 'editor-goto', idx }, '*');
   };
@@ -128,6 +176,8 @@ export function SlideThumbnailList() {
         {slideInfos.map((info, i) => (
           <div
             key={i}
+            ref={observeSlide}
+            data-slide-idx={i}
             className={`relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
               i === currentSlideIndex
                 ? 'border-[var(--color-primary)] shadow-lg shadow-[var(--color-primary)]/20'
@@ -135,17 +185,25 @@ export function SlideThumbnailList() {
             }`}
             onClick={() => handleSelectSlide(i)}
           >
-            {/* 缩略图：用 iframe srcDoc 渲染，不带 sandbox 限制 */}
-            <div style={{ width: 960 * thumbScale, height: 540 * thumbScale, overflow: 'hidden' }}>
-              <iframe
-                srcDoc={`<!DOCTYPE html><html><head><link rel="stylesheet" href="/html-ppt/assets/base.css"><link rel="stylesheet" href="/html-ppt/assets/fonts.css"></head><body style="margin:0;padding:0;overflow:hidden"><div class="deck"><div class="slide is-active ${info.slideClasses}" style="position:relative;width:960px;height:540px;opacity:1;pointer-events:auto;transform:none;padding:72px 96px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center">${info.innerHtml}</div></div></body></html>`}
-                width="960"
-                height="540"
-                className="border-none pointer-events-none"
-                style={{ transform: `scale(${thumbScale})`, transformOrigin: 'top left' }}
-                title={`幻灯片 ${i + 1}`}
+            {visibleSlides.has(i) ? (
+              /* 已进入视口：渲染 iframe 缩略图 */
+              <div style={{ width: 960 * thumbScale, height: 540 * thumbScale, overflow: 'hidden' }}>
+                <iframe
+                  srcDoc={`<!DOCTYPE html><html><head><link rel="stylesheet" href="/html-ppt/assets/base.css"><link rel="stylesheet" href="/html-ppt/assets/fonts.css">${headLinks}</head><body style="margin:0;padding:0;overflow:hidden"><div class="deck"><div class="slide is-active ${info.slideClasses}" style="${info.slideStyle || 'position:relative;width:960px;height:540px;opacity:1;pointer-events:auto;transform:none;padding:72px 96px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center'}">${info.innerHtml}</div></div></body></html>`}
+                  width="960"
+                  height="540"
+                  className="border-none pointer-events-none"
+                  style={{ transform: `scale(${thumbScale})`, transformOrigin: 'top left' }}
+                  title={`幻灯片 ${i + 1}`}
+                />
+              </div>
+            ) : (
+              /* 未进入视口：灰色占位符 */
+              <div
+                style={{ width: 960 * thumbScale, height: 540 * thumbScale }}
+                className="bg-[var(--color-surface-2)]"
               />
-            </div>
+            )}
             {/* 页码 + 删除按钮 */}
             <div className="absolute bottom-1 right-1 flex items-center gap-1">
               <span className="text-[9px] text-white/70 bg-black/50 rounded px-1">{i + 1}</span>

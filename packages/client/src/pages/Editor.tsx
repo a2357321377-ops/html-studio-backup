@@ -4,9 +4,8 @@ import { SlideThumbnailList } from '../components/editor/SlideThumbnailList';
 import { EditorCanvas } from '../components/editor/EditorCanvas';
 import { PropertyPanel } from '../components/editor/PropertyPanel';
 import { FullscreenPresenter } from '../components/FullscreenPresenter';
-import { useEditorStore } from '../hooks/useEditorStore';
+import { useEditorStore, cleanEditorArtifacts } from '../hooks/useEditorStore';
 import { useAIChat } from '../hooks/useAIChat';
-import { cleanEditorArtifacts } from '../hooks/useEditorStore';
 
 /**
  * 编辑器页面
@@ -15,9 +14,6 @@ import { cleanEditorArtifacts } from '../hooks/useEditorStore';
  */
 export default function Editor() {
   const navigate = useNavigate();
-  const aiDeckHtml = useAIChat((s) => s.deckHtml);
-  const editorDeckHtml = useEditorStore((s) => s.deckHtml);
-  const setDeckHtml = useEditorStore((s) => s.setDeckHtml);
   const syncFromIframe = useEditorStore((s) => s.syncFromIframe);
   const canUndo = useEditorStore((s) => s.canUndo);
   const canRedo = useEditorStore((s) => s.canRedo);
@@ -29,11 +25,23 @@ export default function Editor() {
   const [showPresenter, setShowPresenter] = useState(false);
 
   // 从 AI 生成结果初始化编辑器（确保 HTML 是干净的）
-  useEffect(() => {
-    if (aiDeckHtml && !editorDeckHtml) {
-      setDeckHtml(cleanEditorArtifacts(aiDeckHtml));
+  // 硬刷新后需要等待 zustand persist hydration 完成才能拿到 localStorage 中的数据
+  const initEditorFromAI = useCallback(() => {
+    const aiHtml = useAIChat.getState().deckHtml;
+    const editorHtml = useEditorStore.getState().deckHtml;
+    if (aiHtml && !editorHtml) {
+      useEditorStore.getState().setDeckHtml(cleanEditorArtifacts(aiHtml));
     }
-  }, [aiDeckHtml, editorDeckHtml, setDeckHtml]);
+  }, []);
+
+  useEffect(() => {
+    initEditorFromAI();
+    // zustand persist hydration 是异步的（微任务），监听完成事件确保硬刷新后也能正确初始化
+    const unsub = useAIChat.persist.onFinishHydration(() => {
+      initEditorFromAI();
+    });
+    return unsub;
+  }, [initEditorFromAI]);
 
   // 键盘快捷键：Ctrl/Cmd+Z 撤销，Ctrl/Cmd+Shift+Z 重做
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
