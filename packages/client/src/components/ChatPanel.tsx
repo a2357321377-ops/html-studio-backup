@@ -7,6 +7,8 @@ import { useAIChat } from '../hooks/useAIChat';
 import { buildDeckPrompt, buildEditPrompt } from '../lib/ai-client';
 import { streamAI } from '../lib/ai-stream';
 import { cleanEditorArtifacts } from '../hooks/useEditorStore';
+import { selectTemplate } from '../lib/template-selector';
+import { loadFullDeckTemplate } from '../lib/template-loader';
 
 interface ChatPanelProps {
   onHtmlUpdate: (html: string) => void;
@@ -79,8 +81,11 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
     }
 
     // 判断是"重新生成"还是"编辑"
+    // 明显的生成意图关键词：做一个、生成、做个、制作、写一份等
+    const isGenerationIntent = /做一个|生成|做个|制作|写一份|创建|帮我做|帮我写|ppt|幻灯片|演示/i.test(userMsg);
     const isRegenerate = /重新生成|重新制作|从头生成|从零生成|regenerate|start\s*over/i.test(userMsg);
-    const isEditMode = !!deckHtml && !isRegenerate;
+    // 如果用户输入明显是生成意图（而非修改指令），即使有旧 deckHtml 也走生成模式
+    const isEditMode = !!deckHtml && !isRegenerate && !isGenerationIntent;
 
     // 添加用户消息
     const msgId = `msg-${Date.now()}`;
@@ -104,8 +109,18 @@ export function ChatPanel({ onHtmlUpdate, onGenerationDone, onGenerationStart }:
         userMsg,
       );
     } else {
-      // 生成模式：从零生成
-      aiMessages = buildDeckPrompt(fileContent, userMsg);
+      // 生成模式：自动选择并加载最匹配的 full-deck 模板
+      let templateContext: { id: string; indexHtml: string; styleCss: string } | null = null;
+      try {
+        const selected = selectTemplate(userMsg, fileContent);
+        const loaded = await loadFullDeckTemplate(selected.id);
+        templateContext = { id: selected.id, ...loaded };
+      } catch (err) {
+        // 模板加载失败时降级为无模板模式
+        console.warn('Template load failed, falling back to no-template mode:', err);
+      }
+
+      aiMessages = buildDeckPrompt(fileContent, userMsg, templateContext);
       setOriginalPrompt(userMsg);
 
       // 从提示词中提取目标页数（仅生成模式）

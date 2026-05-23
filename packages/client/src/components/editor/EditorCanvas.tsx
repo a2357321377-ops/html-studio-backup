@@ -551,12 +551,10 @@ export function EditorCanvas() {
   const syncFromIframe = useEditorStore((s) => s.syncFromIframe);
   const [scale, setScale] = useState(1);
 
-  // iframeSrcDoc 始终跟踪 deckHtml
   // 每次 deckHtml 外部变化时，更新 srcDoc + bump key，让 iframe 从头重新加载
   // 这比 DOM 替换更可靠，避免了各种 contentDocument 时序问题
   const [iframeKey, setIframeKey] = useState(0);
   const [iframeSrcDoc, setIframeSrcDoc] = useState('');
-  const lastExternalHtmlRef = useRef<string>(''); // 记录最后一次外部传入的 deckHtml
 
   // 计算 iframe 缩放
   const updateScale = useCallback(() => {
@@ -583,6 +581,40 @@ export function EditorCanvas() {
     const existingRuntime = doc.querySelector('script[data-editor-runtime]');
     if (existingRuntime) return;
 
+    // 注入编辑器约束样式：强制 slide 在 960×540 视口内，防止内容溢出
+    // base.css 用 100vw/100vh 定义 .deck 和 .slide，在 iframe 中 100vw 包含滚动条宽度
+    // 导致恶性循环（溢出→滚动条→100vw更宽→溢出更严重）
+    // 用固定像素值替代 100vw/100vh，并用 max-width/max-height 限制所有内容
+    const editorStyle = doc.createElement('style');
+    editorStyle.setAttribute('data-editor-style', '1');
+    editorStyle.textContent = `
+      html, body {
+        width: 960px !important; height: 540px !important;
+        overflow: hidden !important; margin: 0 !important; padding: 0 !important;
+        max-width: 960px !important; max-height: 540px !important;
+      }
+      .deck {
+        width: 960px !important; height: 540px !important;
+        overflow: hidden !important; position: relative !important;
+        max-width: 960px !important; max-height: 540px !important;
+      }
+      .slide {
+        width: 960px !important; height: 540px !important;
+        max-width: 960px !important; max-height: 540px !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+      }
+      .slide *, .slide * * {
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      img, video, canvas, svg {
+        max-width: 768px !important;
+        max-height: 396px !important;
+      }
+    `;
+    doc.head.appendChild(editorStyle);
+
     const slides = doc.querySelectorAll('.slide');
     setTotalSlides(slides.length);
     const idx = useEditorStore.getState().currentSlideIndex;
@@ -596,18 +628,18 @@ export function EditorCanvas() {
     doc.body.appendChild(script);
   }, [setTotalSlides]);
 
-  // 当 deckHtml 从外部变化时（初始化、undo/redo、AI 同步），重新加载 iframe
+  // 当 deckHtml 变化时，判断是否需要重新加载 iframe
+  // syncFromIframe() 更新 deckHtml 时会同时设置 _lastSyncHtml = cleanHtml，
+  // 如果 deckHtml === _lastSyncHtml 说明是内部回写，不需要重载（避免翻页闪烁）
+  // 其他情况（初始化、undo/redo、AI 同步）_lastSyncHtml 为空，需要重载
+  const _lastSyncHtml = useEditorStore((s) => s._lastSyncHtml);
+
   useLayoutEffect(() => {
     if (!deckHtml) return;
-    // 区分外部更新和 syncFromIframe 回写：
-    // syncFromIframe 更新 deckHtml 后，lastExternalHtmlRef 已经被同步更新了，
-    // 所以不会触发重复加载
-    if (deckHtml !== lastExternalHtmlRef.current) {
-      lastExternalHtmlRef.current = deckHtml;
-      setIframeSrcDoc(deckHtml);
-      setIframeKey((k) => k + 1);
-    }
-  }, [deckHtml]);
+    if (deckHtml === _lastSyncHtml) return; // 内部回写，跳过重载
+    setIframeSrcDoc(deckHtml);
+    setIframeKey((k) => k + 1);
+  }, [deckHtml, _lastSyncHtml]);
 
   // 注册 iframe ref 到 store + 注入 runtime
   // 使用 useLayoutEffect 确保 load 事件监听在浏览器绘制前注册
@@ -654,20 +686,14 @@ export function EditorCanvas() {
       }
       if (e.data?.type === 'editor-element-deselected') {
         setSelectedElement(null);
-        // 取消选择时也同步 HTML，确保编辑内容反映到缩略图
         syncFromIframe();
-        lastExternalHtmlRef.current = useEditorStore.getState().deckHtml;
       }
       if (e.data?.type === 'editor-content-changed') {
         syncFromIframe();
-        // syncFromIframe 更新了 deckHtml，需要更新 lastExternalHtmlRef
-        // 防止 useLayoutEffect 以为这是外部变化而重新加载 iframe
-        lastExternalHtmlRef.current = useEditorStore.getState().deckHtml;
       }
       if (e.data?.type === 'editor-element-moved' || e.data?.type === 'editor-element-resized') {
         setSelectedElement(e.data.info);
         syncFromIframe();
-        lastExternalHtmlRef.current = useEditorStore.getState().deckHtml;
       }
     };
     window.addEventListener('message', handleMessage);

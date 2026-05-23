@@ -15,9 +15,34 @@ export function cleanEditorArtifacts(html: string): string {
   doc.querySelectorAll('[data-resize-handle]').forEach(el => el.remove());
   // 移除编辑 runtime script
   doc.querySelectorAll('[data-editor-runtime]').forEach(el => el.remove());
+  // 移除编辑器约束样式
+  doc.querySelectorAll('[data-editor-style]').forEach(el => el.remove());
   // 移除 contenteditable 属性（编辑器可能给元素添加了此属性）
   doc.querySelectorAll('[contenteditable]').forEach(el => {
     el.removeAttribute('contenteditable');
+  });
+  // 还原被编辑器约束覆盖的内联样式：
+  // 编辑器注入的 [data-editor-style] 用 960px 替代了 100vw，
+  // 导出时需要还原为 100vw 让幻灯片在全屏下正常显示
+  const deckEl = doc.querySelector('.deck');
+  if (deckEl) {
+    const s = deckEl.getAttribute('style') || '';
+    // 如果 .deck 的内联 style 里有固定 960/540 值（可能是编辑器 drag 残留），还原为 viewport 单位
+    const cleaned = s
+      .replace(/width:\s*960px/gi, 'width:100vw')
+      .replace(/height:\s*540px/gi, 'height:100vh')
+      .replace(/max-width:\s*960px;?/gi, '')
+      .replace(/max-height:\s*540px;?/gi, '');
+    if (cleaned !== s) deckEl.setAttribute('style', cleaned);
+  }
+  doc.querySelectorAll('.slide').forEach(slide => {
+    const s = slide.getAttribute('style') || '';
+    const cleaned = s
+      .replace(/width:\s*960px/gi, '')
+      .replace(/height:\s*540px/gi, '')
+      .replace(/max-width:\s*960px;?/gi, '')
+      .replace(/max-height:\s*540px;?/gi, '');
+    if (cleaned !== s) slide.setAttribute('style', cleaned);
   });
   return `<!DOCTYPE html>\n${doc.documentElement.outerHTML}`;
 }
@@ -51,6 +76,10 @@ interface EditorState {
   // 当前编辑的 HTML（从 useAIChat.deckHtml 初始化）
   deckHtml: string;
   setDeckHtml: (html: string) => void;
+
+  // 内部回写标记：syncFromIframe 更新 deckHtml 时同步设置此值
+  // EditorCanvas 用 deckHtml === _lastSyncHtml 来判断是否跳过 iframe 重载
+  _lastSyncHtml: string;
 
   // 当前选中的幻灯片索引（0-based）
   currentSlideIndex: number;
@@ -93,10 +122,11 @@ interface EditorState {
 
 export const useEditorStore = create<EditorState>()((set, get) => ({
   deckHtml: '',
+  _lastSyncHtml: '',
   setDeckHtml: (html) => {
     const prev = get().deckHtml;
     const undoStack = prev ? [...get().undoStack, prev].slice(-MAX_UNDO_SIZE) : get().undoStack;
-    set({ deckHtml: html, undoStack, redoStack: [], canUndo: undoStack.length > 0, canRedo: false });
+    set({ deckHtml: html, _lastSyncHtml: '', undoStack, redoStack: [], canUndo: undoStack.length > 0, canRedo: false });
   },
 
   currentSlideIndex: 0,
@@ -127,6 +157,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     const newRedo = deckHtml ? [...redoStack, deckHtml] : redoStack;
     set({
       deckHtml: prev,
+      _lastSyncHtml: '',
       undoStack: newUndo,
       redoStack: newRedo,
       canUndo: newUndo.length > 0,
@@ -145,6 +176,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     const newUndo = deckHtml ? [...undoStack, deckHtml] : undoStack;
     set({
       deckHtml: next,
+      _lastSyncHtml: '',
       undoStack: newUndo,
       redoStack: newRedo,
       canUndo: newUndo.length > 0,
@@ -175,7 +207,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
       if (prevNormalized === newNormalized) return;
     }
     const undoStack = prev ? [...get().undoStack, prev].slice(-MAX_UNDO_SIZE) : get().undoStack;
-    set({ deckHtml: cleanHtml, undoStack, redoStack: [], canUndo: undoStack.length > 0, canRedo: false });
+    set({ deckHtml: cleanHtml, _lastSyncHtml: cleanHtml, undoStack, redoStack: [], canUndo: undoStack.length > 0, canRedo: false });
     // 延迟同步到 AI store，避免触发额外的重渲染
     requestAnimationFrame(() => useAIChat.getState().setDeckHtml(cleanHtml));
   },
@@ -187,6 +219,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
   reset: () =>
     set({
       deckHtml: '',
+      _lastSyncHtml: '',
       currentSlideIndex: 0,
       totalSlides: 0,
       selectedElement: null,
