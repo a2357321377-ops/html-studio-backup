@@ -30,6 +30,75 @@ function ensureFirstSlideActive(html: string): string {
   }
 }
 
+/** 资源内联缓存 — 同一会话内只 fetch 一次 */
+const resourceCache = new Map<string, string>();
+
+/** 将 HTML 中引用的外部 CSS/JS 资源内联为 <style>/<script> 标签，
+ *  确保导出的 HTML 文件在任意位置打开都能独立运行（不依赖相对路径）。
+ *  - <link rel="stylesheet" href="..."> → <style>...</style>
+ *  - <script src="..."> → <script>...</script>
+ */
+async function inlineExternalResources(html: string): Promise<string> {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
+  // 解析相对路径的 base URL — 当前页面 origin + /html-ppt/assets/
+  const baseUrl = window.location.origin;
+
+  // 内联所有 <link rel="stylesheet">
+  const links = Array.from(doc.querySelectorAll('link[rel="stylesheet"][href]'));
+  for (const link of links) {
+    const href = link.getAttribute('href') || '';
+    // 跳过绝对 URL（http/https CDN 资源）和 data: URL
+    if (/^(https?:|data:|\/\/)/.test(href)) continue;
+    try {
+      const absUrl = new URL(href, baseUrl).href;
+      let css = resourceCache.get(absUrl);
+      if (!css) {
+        const resp = await fetch(absUrl);
+        if (resp.ok) {
+          css = await resp.text();
+          resourceCache.set(absUrl, css);
+        } else continue;
+      }
+      // 替换 <link> 为 <style>
+      const style = doc.createElement('style');
+      style.textContent = css;
+      link.replaceWith(style);
+    } catch {
+      // fetch 失败时保留原始 <link>（降级）
+    }
+  }
+
+  // 内联所有 <script src="...">
+  const scripts = Array.from(doc.querySelectorAll('script[src]'));
+  for (const script of scripts) {
+    const src = script.getAttribute('src') || '';
+    if (/^(https?:|data:|\/\/)/.test(src)) continue;
+    try {
+      const absUrl = new URL(src, baseUrl).href;
+      let js = resourceCache.get(absUrl);
+      if (!js) {
+        const resp = await fetch(absUrl);
+        if (resp.ok) {
+          js = await resp.text();
+          resourceCache.set(absUrl, js);
+        } else continue;
+      }
+      // 替换 <script src> 为内联 <script>
+      const inline = doc.createElement('script');
+      inline.textContent = js;
+      // 保留 defer 属性
+      if (script.hasAttribute('defer')) inline.setAttribute('defer', '');
+      script.replaceWith(inline);
+    } catch {
+      // fetch 失败时保留原始 <script>（降级）
+    }
+  }
+
+  return `<!DOCTYPE html>\n${doc.documentElement.outerHTML}`;
+}
+
 interface PreviewPanelProps {
   deckHtml: string;
   generating: boolean;
@@ -147,10 +216,11 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
     }
   };
 
-  // 导出 HTML
-  const handleExport = () => {
+  // 导出 HTML — 内联所有外部资源，确保导出文件在任何位置都能独立运行
+  const handleExport = async () => {
     if (!cleanHtml) return;
-    const blob = new Blob([cleanHtml], { type: 'text/html;charset=utf-8' });
+    const selfContained = await inlineExternalResources(cleanHtml);
+    const blob = new Blob([selfContained], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

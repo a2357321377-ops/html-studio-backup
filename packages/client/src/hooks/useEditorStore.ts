@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { useAIChat } from './useAIChat';
 
 /**
- * 清理 HTML 中的编辑器注入元素（高亮框、编辑 runtime、contenteditable 属性）
+ * 清理 HTML 中的编辑器注入元素（高亮框、编辑 runtime、contenteditable 属性、内联样式残留）
  * 用于预览、演讲者模式、导出等非编辑场景
  */
 export function cleanEditorArtifacts(html: string): string {
@@ -21,13 +21,11 @@ export function cleanEditorArtifacts(html: string): string {
   doc.querySelectorAll('[contenteditable]').forEach(el => {
     el.removeAttribute('contenteditable');
   });
-  // 还原被编辑器约束覆盖的内联样式：
-  // 编辑器注入的 [data-editor-style] 用 960px 替代了 100vw，
-  // 导出时需要还原为 100vw 让幻灯片在全屏下正常显示
+
+  // 还原 .deck 内联样式：编辑器注入 960px 替代 100vw，导出需还原
   const deckEl = doc.querySelector('.deck');
   if (deckEl) {
     const s = deckEl.getAttribute('style') || '';
-    // 如果 .deck 的内联 style 里有固定 960/540 值（可能是编辑器 drag 残留），还原为 viewport 单位
     const cleaned = s
       .replace(/width:\s*960px/gi, 'width:100vw')
       .replace(/height:\s*540px/gi, 'height:100vh')
@@ -35,15 +33,28 @@ export function cleanEditorArtifacts(html: string): string {
       .replace(/max-height:\s*540px;?/gi, '');
     if (cleaned !== s) deckEl.setAttribute('style', cleaned);
   }
+
+  // 清理 .slide 上的编辑器内联样式残留：
+  // 编辑器 [data-editor-style] 用 !important 覆盖了 .slide 的 CSS，
+  // 但删除 style 标签后内联残留的 width/height/max-width/max-height 也需清理
   doc.querySelectorAll('.slide').forEach(slide => {
     const s = slide.getAttribute('style') || '';
     const cleaned = s
-      .replace(/width:\s*960px/gi, '')
-      .replace(/height:\s*540px/gi, '')
+      .replace(/width:\s*960px;?/gi, '')
+      .replace(/height:\s*540px;?/gi, '')
       .replace(/max-width:\s*960px;?/gi, '')
-      .replace(/max-height:\s*540px;?/gi, '');
-    if (cleaned !== s) slide.setAttribute('style', cleaned);
+      .replace(/max-height:\s*540px;?/gi, '')
+      .replace(/;\s*;/g, ';')
+      .replace(/;?\s*$/, '');
+    if (cleaned !== s) {
+      if (cleaned) {
+        slide.setAttribute('style', cleaned);
+      } else {
+        slide.removeAttribute('style');
+      }
+    }
   });
+
   return `<!DOCTYPE html>\n${doc.documentElement.outerHTML}`;
 }
 
