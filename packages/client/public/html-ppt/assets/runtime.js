@@ -37,6 +37,23 @@
     return m ? parseInt(m[1], 10) - 1 : -1;
   }
 
+  /* ========== Embedded iframe detection ==========
+   * When running inside a srcDoc iframe (no real URL), skip heavy init
+   * (overview grid, progress bar, notes, keyboard nav, BroadcastChannel).
+   * Parent page controls slide switching via postMessage or direct DOM access.
+   * This makes iframe rendering ~10x faster by avoiding DOM cloning and
+   * heavy event listeners. FullscreenPresenter still gets full runtime
+   * because it uses the actual HTML file with a real URL.
+   */
+  function isEmbeddedIframe() {
+    try {
+      // srcDoc iframe: location.href is "about:srcdoc", no real path
+      // window.parent !== window means we're in an iframe
+      // document.referrer is empty for srcDoc iframes
+      return window.parent !== window && (location.href.indexOf('about:') === 0 || location.protocol === 'about:');
+    } catch(e) { return false; }
+  }
+
   ready(function () {
     const deck = document.querySelector('.deck');
     if (!deck) return;
@@ -45,6 +62,29 @@
 
     const previewOnlyIdx = getPreviewIdx();
     const isPreviewMode = previewOnlyIdx >= 0 && previewOnlyIdx < slides.length;
+    const isEmbedded = isEmbeddedIframe();
+
+    /* ===== Embedded iframe: minimal init only ===== */
+    if (isEmbedded && !isPreviewMode) {
+      // Just ensure first slide is active, respond to postMessage for page switching
+      slides.forEach((s, i) => {
+        s.classList.toggle('is-active', i === 0);
+        s.classList.toggle('is-prev', i < 0);
+      });
+      window.addEventListener('message', function(e) {
+        if (!e.data) return;
+        if (e.data.type === 'preview-goto') {
+          const n = parseInt(e.data.idx, 10);
+          if (n >= 0 && n < slides.length) {
+            slides.forEach((s, i) => {
+              s.classList.toggle('is-active', i === n);
+              s.classList.toggle('is-prev', i < n);
+            });
+          }
+        }
+      });
+      return; // skip all heavy init
+    }
 
     /* ===== Preview-only mode: show one slide, hide everything else ===== */
     if (isPreviewMode) {

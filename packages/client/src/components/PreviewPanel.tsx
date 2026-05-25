@@ -1,8 +1,34 @@
-import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { useRef, useEffect, useLayoutEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FullscreenPresenter } from './FullscreenPresenter';
 import { useAIChat } from '../hooks/useAIChat';
 import { cleanEditorArtifacts } from '../hooks/useEditorStore';
+
+/** 在 HTML 中预标记第一页 slide 为 is-active，确保 iframe 渲染时 CSS 立即生效。
+ *  base.css 规则：.slide{opacity:0}，只有 .slide.is-active{opacity:1}
+ *  如果 HTML 源码中没有 is-active，iframe 加载后所有 slide 都不可见（黑屏）
+ *  直到 runtime.js 执行才设置 is-active — 但 runtime.js 用 defer 加载，
+ *  在 srcDoc iframe 中可能延迟执行或因 React useEffect 竞态导致 load 事件丢失。
+ *  预标记让 CSS 在第一帧就生效，无需等待任何 JS。
+ */
+function ensureFirstSlideActive(html: string): string {
+  if (!html) return html;
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const slides = doc.querySelectorAll('.slide');
+    if (slides.length === 0) return html;
+    // 如果没有任何 slide 有 is-active，给第一页加上
+    if (!doc.querySelector('.slide.is-active')) {
+      slides[0].classList.add('is-active');
+      // 序列化回 HTML 字符串
+      const result = `<!DOCTYPE html>\n${doc.documentElement.outerHTML}`;
+      return result;
+    }
+    return html;
+  } catch {
+    return html;
+  }
+}
 
 interface PreviewPanelProps {
   deckHtml: string;
@@ -20,8 +46,20 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
   const generationPhase = useAIChat((s) => s.generationPhase);
   const navigate = useNavigate();
 
-  // 清理编辑器注入的元素，确保预览/导出/演讲者模式中不会出现编辑痕迹
-  const cleanHtml = useMemo(() => cleanEditorArtifacts(deckHtml), [deckHtml]);
+  const [iframeKey, setIframeKey] = useState(0);
+
+  // 清理编辑器注入的元素 + 预标记第一页 is-active
+  const cleanHtml = useMemo(() => {
+    const cleaned = cleanEditorArtifacts(deckHtml);
+    return ensureFirstSlideActive(cleaned);
+  }, [deckHtml]);
+
+  // 当 cleanHtml 变更时，bump iframe key 确保重新加载
+  useLayoutEffect(() => {
+    if (cleanHtml) {
+      setIframeKey(k => k + 1);
+    }
+  }, [cleanHtml]);
 
   // 计算 iframe 缩放
   const updateScale = useCallback(() => {
@@ -42,8 +80,9 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
     return () => observer.disconnect();
   }, [updateScale]);
 
-  // iframe 加载完成后，恢复当前页的 is-active 状态
-  useEffect(() => {
+  // iframe 加载完成后，设置正确的 is-active 页
+  // 使用 useLayoutEffect 同步注册 load 监听，避免 React useEffect 异步注册导致竞态丢失
+  useLayoutEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe || !cleanHtml) return;
 
@@ -62,9 +101,19 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
       }
     };
 
+    // 如果 iframe 已经加载完成（srcDoc 简单内容可能在 key bump 之前就加载了），立即处理
+    try {
+      const doc = iframe.contentDocument;
+      if (doc && doc.querySelector('.slide')) {
+        handleLoad();
+      }
+    } catch {
+      // cross-origin
+    }
+
     iframe.addEventListener('load', handleLoad);
     return () => iframe.removeEventListener('load', handleLoad);
-  }, [cleanHtml, currentPage]);
+  }, [iframeKey, cleanHtml, currentPage]);
 
   // 从 HTML 中估算页数
   useEffect(() => {
@@ -158,6 +207,7 @@ export function PreviewPanel({ deckHtml, generating }: PreviewPanelProps) {
             }}
           >
             <iframe
+              key={iframeKey}
               ref={iframeRef}
               srcDoc={cleanHtml}
               width="960"

@@ -1,9 +1,13 @@
-/* html-ppt :: shared webfonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;800;900&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@200;300;400;500;600;700;900&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,800;1,400&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap');
+/* html-ppt :: shared webfonts
+ * 所有 Google Fonts CDN @import 已移除。
+ * 原因：iframe 中加载 fonts.css 时，Google Fonts 请求在网络受限环境下
+ * (GFW/防火墙) 会 ERR_CONNECTION_RESET，浏览器对每个失败请求超时等待+重试，
+ * 7 个字体全部超时后才触发 iframe load 事件，导致 ~80 秒延迟。
+ *
+ * base.css 中的 CSS 变量已包含完整的系统字体 fallback：
+ *   --font-sans: 'Inter','Noto Sans SC',-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif;
+ *   --font-serif: 'Playfair Display','Noto Serif SC',Georgia,serif;
+ *   --font-mono: 'JetBrains Mono','IBM Plex Mono',SFMono-Regular,Menlo,monospace;
+ * 当 CDN 字体不可用时，浏览器自动 fallback 到系统中已有的字体。
+ * 如果用户本地安装了 Inter/Noto Sans SC 等字体，仍然会优先使用。
+ */

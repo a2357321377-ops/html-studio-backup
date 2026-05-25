@@ -1,19 +1,23 @@
 /* html-ppt :: fx-runtime.js
  * Canvas FX autoloader + lifecycle manager.
- * - Dynamically loads all fx modules listed in FX_LIST
+ * - Loads fx-bundle.js (single file containing all FX modules)
  * - Initializes [data-fx] elements when their slide becomes active
  * - Calls handle.stop() when the slide leaves
+ *
+ * Previous version loaded 21 individual FX files serially (s.async=false),
+ * causing slow iframe rendering. Now uses a single bundle for 1 HTTP request.
+ *
+ * In embedded srcDoc iframe (detected via about: protocol), FX loading
+ * is deferred with a small delay to prioritize content rendering.
  */
 (function(){
   'use strict';
 
-  const FX_LIST = [
-    '_util',
-    'particle-burst','confetti-cannon','firework','starfield','matrix-rain',
-    'knowledge-graph','neural-net','constellation','orbit-ring','galaxy-swirl',
-    'word-cascade','letter-explode','chain-react','magnetic-field','data-stream',
-    'gradient-blob','sparkle-trail','shockwave','typewriter-multi','counter-explosion'
-  ];
+  // Check if we're in an embedded srcDoc iframe — delay FX loading there
+  var isEmbedded = false;
+  try {
+    isEmbedded = window.parent !== window && (location.href.indexOf('about:') === 0 || location.protocol === 'about:');
+  } catch(e) {}
 
   // Resolve base path of this script so it works from any page location.
   const myScript = document.currentScript || (function(){
@@ -21,19 +25,19 @@
     for (const s of all){ if (s.src && s.src.indexOf('fx-runtime.js')>-1) return s; }
     return null;
   })();
-  const base = myScript ? myScript.src.replace(/fx-runtime\.js.*$/, 'fx/') : 'assets/animations/fx/';
+  const base = myScript ? myScript.src.replace(/fx-runtime\.js.*$/, '') : '/html-ppt/assets/animations/';
 
-  let loaded = 0;
-  const total = FX_LIST.length;
-  const ready = new Promise((resolve) => {
-    if (!total) return resolve();
-    FX_LIST.forEach((name) => {
-      const s = document.createElement('script');
-      s.src = base + name + '.js';
-      s.async = false;
-      s.onload = s.onerror = () => { if (++loaded >= total) resolve(); };
+  // In embedded iframe: delay FX bundle loading so content renders first
+  var loadDelay = isEmbedded ? 500 : 0;
+
+  var ready = new Promise((resolve) => {
+    setTimeout(() => {
+      var s = document.createElement('script');
+      s.src = base + 'fx-bundle.js';
+      s.onload = () => resolve();
+      s.onerror = () => { console.warn('[hpx-fx] Failed to load fx-bundle.js'); resolve(); };
       document.head.appendChild(s);
-    });
+    }, loadDelay);
   });
 
   window.__hpxActive = window.__hpxActive || new Map();

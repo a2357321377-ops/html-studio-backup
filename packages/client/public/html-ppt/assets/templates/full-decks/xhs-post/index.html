@@ -7,12 +7,13 @@
 <link rel="stylesheet" href="../../../assets/base.css">
 <link rel="stylesheet" href="../../../assets/animations/animations.css">
 <link rel="stylesheet" href="style.css">
+<script defer src="../../../assets/animations/fx-runtime.js"></script>
 </head>
 <body class="tpl-xhs-post">
 <div class="deck">
 
   <!-- 1. Cover -->
-  <section class="slide" data-title="Cover">
+  <section class="slide" data-title="Cover" data-fx="particle-burst">
     <div class="page-dot">1 / 9</div>
     <div class="sticker pink" style="top:120px;left:48px;transform:rotate(-6deg)">💤 救命</div>
     <div class="sticker yellow" style="top:140px;right:64px;transform:rotate(5deg)">亲测 7 天</div>
@@ -45,7 +46,7 @@
   </section>
 
   <!-- 4. Aha -->
-  <section class="slide" data-title="Aha">
+  <section class="slide" data-title="Aha" data-fx="sparkle-trail">
     <div class="page-dot">4 / 9</div>
     <div class="sticker green" style="top:100px;right:48px;transform:rotate(4deg)">✨ aha moment</div>
     <p class="lede mt-l" style="color:var(--accent);font-weight:700">💡 真相是</p>
@@ -113,7 +114,7 @@
   </section>
 
   <!-- 9. CTA -->
-  <section class="slide" data-title="CTA">
+  <section class="slide" data-title="CTA" data-fx="confetti-cannon">
     <div class="page-dot">9 / 9</div>
     <div class="big-emoji" style="margin-top:60px">💌</div>
     <h2 class="h2 tc mt-l">觉得有用的话</h2>
@@ -129,5 +130,5 @@
   </section>
 
 </div>
-<script src="../../../assets/runtime.js"></script>
+<script defer src="../../../assets/runtime.js"></script>
 </body></html>

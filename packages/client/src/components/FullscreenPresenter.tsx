@@ -1,4 +1,21 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+
+/** 在 HTML 中预标记第一页 slide 为 is-active，确保 iframe 渲染时 CSS 立即生效 */
+function ensureFirstSlideActive(html: string): string {
+  if (!html) return html;
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const slides = doc.querySelectorAll('.slide');
+    if (slides.length === 0) return html;
+    if (!doc.querySelector('.slide.is-active')) {
+      slides[0].classList.add('is-active');
+      return `<!DOCTYPE html>\n${doc.documentElement.outerHTML}`;
+    }
+    return html;
+  } catch {
+    return html;
+  }
+}
 
 interface FullscreenPresenterProps {
   deckHtml: string;
@@ -11,6 +28,10 @@ export function FullscreenPresenter({ deckHtml, totalPages, onClose }: Fullscree
   const [currentPage, setCurrentPage] = useState(1);
   const [showControls, setShowControls] = useState(true);
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  // 使用 srcDoc 而非 Blob URL：srcDoc iframe 可以直接访问 contentDocument 来切换 slide，
+  // Blob URL iframe 因跨域限制无法访问 contentDocument，导致翻页 DOM 操作失败
+  const cleanHtml = useMemo(() => ensureFirstSlideActive(deckHtml), [deckHtml]);
 
   // 翻页 — 操作 iframe 内 DOM 切换 is-active class
   const gotoPage = useCallback((idx: number) => {
@@ -34,22 +55,27 @@ export function FullscreenPresenter({ deckHtml, totalPages, onClose }: Fullscree
     }
   }, [totalPages]);
 
-  // 键盘事件
+  // 键盘事件 — 使用 capture 模式确保优先于 iframe 内 runtime.js 的键盘监听
+  // iframe 获得焦点时，键盘事件先传给 iframe 内 runtime.js，外层监听不到
+  // capture 模式在事件捕获阶段拦截，比 iframe 内的冒泡监听更早执行
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
         e.preventDefault();
+        e.stopPropagation();
         gotoPage(currentPage);
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
         e.preventDefault();
+        e.stopPropagation();
         gotoPage(currentPage - 2);
       } else if (e.key === 'Escape') {
         e.preventDefault();
+        e.stopPropagation();
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [currentPage, gotoPage, onClose]);
 
   // 鼠标移动时显示控制栏，3秒后自动隐藏
@@ -112,10 +138,10 @@ export function FullscreenPresenter({ deckHtml, totalPages, onClose }: Fullscree
       className="fixed inset-0 z-50 bg-black flex items-center justify-center"
       onMouseMove={showControlsTemporarily}
     >
-      {/* 幻灯片 iframe — 全屏居中 */}
+      {/* 幻灯片 iframe — 全屏居中，使用 srcDoc 以便直接操作 contentDocument */}
       <iframe
         ref={iframeRef}
-        srcDoc={deckHtml}
+        srcDoc={cleanHtml}
         className="w-full h-full border-none"
         style={{ maxWidth: '100vw', maxHeight: '100vh' }}
         title="全屏演讲预览"

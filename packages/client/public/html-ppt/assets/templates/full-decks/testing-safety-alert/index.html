@@ -6,13 +6,15 @@
 <title>Testing Safety Alert</title>
 <link rel="stylesheet" href="../../../assets/fonts.css">
 <link rel="stylesheet" href="../../../assets/base.css">
+<link rel="stylesheet" href="../../../assets/animations/animations.css">
 <link rel="stylesheet" href="style.css">
+<script defer src="../../../assets/animations/fx-runtime.js"></script>
 </head>
 <body class="tpl-testing-safety-alert">
 <div class="deck">
 
   <!-- 1. COVER -->
-  <section class="slide is-active">
+  <section class="slide is-active" data-fx="shockwave">
     <div class="ts-stripe"></div>
     <div class="ts-chrome"><span class="ts-alert-tag">ai safety · 高优先级</span><span class="ts-page">01 / 08</span></div>
     <div class="ts-kicker">2026 年最重要的一条判断</div>
@@ -84,7 +86,7 @@
   </section>
 
   <!-- 5. CHART -->
-  <section class="slide">
+  <section class="slide" data-fx="data-stream">
     <div class="ts-stripe"></div>
     <div class="ts-chrome"><span class="ts-alert-tag amber">incident report · q1</span><span class="ts-page">05 / 08</span></div>
     <h2 class="ts-h2">我们 Q1 的 <span class="red">12 起 AI 事故</span></h2>
@@ -165,7 +167,7 @@
   </section>
 
   <!-- 8. THANKS -->
-  <section class="slide">
+  <section class="slide" data-fx="firework">
     <div class="ts-stripe"></div>
     <div class="ts-chrome"><span class="ts-alert-tag amber">please stay safe</span><span class="ts-page">08 / 08</span></div>
     <div style="margin:auto 0">
@@ -178,6 +180,6 @@
   </section>
 
 </div>
-<script src="../../../assets/runtime.js"></script>
+<script defer src="../../../assets/runtime.js"></script>
 </body>
 </html>

@@ -7,12 +7,13 @@
 <link rel="stylesheet" href="../../../assets/base.css">
 <link rel="stylesheet" href="../../../assets/animations/animations.css">
 <link rel="stylesheet" href="style.css">
+<script defer src="../../../assets/animations/fx-runtime.js"></script>
 </head>
 <body class="tpl-tech-sharing">
 <div class="deck">
 
   <!-- 1. Cover -->
-  <section class="slide" data-title="Cover">
+  <section class="slide" data-title="Cover" data-fx="constellation">
     <p class="kicker">tech-sharing / 2026-04-15</p>
     <h1 class="h1 anim-fade-up" data-anim="fade-up">Rust 异步运行时<br>到底在<span style="background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent">调度什么</span>?</h1>
     <p class="lede mt-m">从 <span class="mono">Future::poll</span> 到 tokio 的 work-stealing，一次讲清楚。</p>
@@ -72,7 +73,7 @@
   </section>
 
   <!-- 5. Deep dive 2 -->
-  <section class="slide" data-title="Deep Dive 2">
+  <section class="slide" data-title="Deep Dive 2" data-fx="neural-net">
     <p class="kicker">deep-dive · 2 / 2</p>
     <h2 class="h2">Tokio 是一个偷任务的小工。</h2>
     <div class="grid g2 mt-l" style="align-items:start">
@@ -139,7 +140,7 @@
   </section>
 
   <!-- 8. Q&A -->
-  <section class="slide center tc" data-title="Q and A">
+  <section class="slide center tc" data-title="Q and A" data-fx="firework">
     <div>
       <div class="mono" style="font-size:120px;color:var(--accent);font-weight:800;letter-spacing:-.04em">?</div>
       <h2 class="h2">Questions?</h2>
@@ -152,5 +153,5 @@
   </section>
 
 </div>
-<script src="../../../assets/runtime.js"></script>
+<script defer src="../../../assets/runtime.js"></script>
 </body></html>

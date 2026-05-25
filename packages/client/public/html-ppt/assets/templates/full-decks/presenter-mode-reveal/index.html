@@ -9,12 +9,13 @@
 <link rel="stylesheet" id="theme-link" href="../../../assets/themes/tokyo-night.css">
 <link rel="stylesheet" href="../../../assets/animations/animations.css">
 <link rel="stylesheet" href="style.css">
+<script defer src="../../../assets/animations/fx-runtime.js"></script>
 </head>
 <body class="tpl-presenter-mode-reveal">
 <div class="deck">
 
   <!-- ============ 1. COVER ============ -->
-  <section class="slide" data-title="Cover">
+  <section class="slide" data-title="Cover" data-fx="constellation">
     <p class="kicker">presenter-mode / demo</p>
     <h1 class="h1 anim-fade-up" data-anim="fade-up">如何做一场<br><span style="background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent">有逐字稿</span>的技术分享</h1>
     <p class="lede mt-m">按 <span class="mono">S</span> 进入演讲者视图 · <span class="mono">T</span> 切换主题 · <span class="mono">← →</span> 翻页</p>
@@ -145,7 +146,7 @@
   </section>
 
   <!-- ============ 6. DEMO + CLOSING ============ -->
-  <section class="slide" data-title="Demo & Close">
+  <section class="slide" data-title="Demo & Close" data-fx="firework">
     <p class="kicker">// part 04-05 · demo + close</p>
     <h2 class="h2">现在<span class="accent">你也能做到</span></h2>
     <div class="code-block mt-m">
@@ -182,6 +183,6 @@
   S 演讲者视图 · T 切换主题 · ← → 翻页 · F 全屏 · O 总览 · R 重置计时
 </div>
 
-<script src="../../../assets/runtime.js"></script>
+<script defer src="../../../assets/runtime.js"></script>
 </body>
 </html>

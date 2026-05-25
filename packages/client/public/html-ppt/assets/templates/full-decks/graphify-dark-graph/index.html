@@ -6,13 +6,15 @@
 <title>Graphify Dark Graph</title>
 <link rel="stylesheet" href="../../../assets/fonts.css">
 <link rel="stylesheet" href="../../../assets/base.css">
+<link rel="stylesheet" href="../../../assets/animations/animations.css">
 <link rel="stylesheet" href="style.css">
+<script defer src="../../../assets/animations/fx-runtime.js"></script>
 </head>
 <body class="tpl-graphify-dark-graph">
 <div class="deck">
 
   <!-- 1. COVER -->
-  <section class="slide is-active">
+  <section class="slide is-active" data-fx="matrix-rain">
     <div class="gd-ambient"><div class="gd-orb gd-orb-1"></div><div class="gd-orb gd-orb-2"></div><div class="gd-orb gd-orb-3"></div></div>
     <!-- live force-directed graph bg -->
     <svg viewBox="0 0 1600 900" style="position:absolute;inset:0;width:100%;height:100%;opacity:.38;z-index:1" xmlns="http://www.w3.org/2000/svg">
@@ -101,7 +103,7 @@
   </section>
 
   <!-- 5. CHART — race diagram -->
-  <section class="slide">
+  <section class="slide" data-fx="neural-net">
     <div class="gd-ambient"><div class="gd-orb gd-orb-3"></div></div>
     <div class="gd-snum">05 / 08</div>
     <p class="gd-eyebrow">Efficiency Race</p>
@@ -165,7 +167,7 @@
   </section>
 
   <!-- 8. THANKS -->
-  <section class="slide">
+  <section class="slide" data-fx="firework">
     <div class="gd-ambient"><div class="gd-orb gd-orb-2"></div></div>
     <div class="gd-snum">08 / 08</div>
     <div style="margin:auto 0;text-align:center">
@@ -175,6 +177,6 @@
   </section>
 
 </div>
-<script src="../../../assets/runtime.js"></script>
+<script defer src="../../../assets/runtime.js"></script>
 </body>
 </html>
