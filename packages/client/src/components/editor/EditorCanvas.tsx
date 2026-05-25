@@ -163,11 +163,43 @@ const runtimeScript = `
   }
 
   // 查找最近的可编辑祖先元素（向上冒泡到 slide 边界）
+  // 冒泡穿过 DIV 等纯容器元素，停在有语义的元素或 .slide 边界
+  var EDITABLE_TAGS = ['H1','H2','H3','H4','H5','H6','P','SPAN','LI','A','BLOCKQUOTE','PRE','CODE','STRONG','EM','B','I','LABEL','TD','TH','FIGCAPTION'];
+  var CONTAINER_TAGS = ['DIV','SECTION','ARTICLE','MAIN','HEADER','FOOTER','NAV','ASIDE','FIGURE','UL','OL','DL','TABLE','FORM'];
+
   function findEditableTarget(el) {
     var target = el;
-    while (target && target.parentElement && !target.parentElement.classList.contains('slide') && target.tagName !== 'IMG' && target.tagName !== 'H1' && target.tagName !== 'H2' && target.tagName !== 'H3' && target.tagName !== 'P' && target.tagName !== 'SPAN' && target.tagName !== 'LI' && target.tagName !== 'A') {
+    // 如果点击的就是 IMG，直接返回（图片可选中但不能编辑文字）
+    if (target.tagName === 'IMG') return target;
+
+    // 向上冒泡：穿过 DIV 等容器，停在语义元素（H/P/SPAN 等）或 .slide 边界
+    while (target && target.parentElement && !target.parentElement.classList.contains('slide')) {
+      // 遇到语义元素（有文字内容的）：停在这里，它就是可编辑目标
+      if (EDITABLE_TAGS.indexOf(target.tagName) >= 0) break;
+      // 遇到纯容器 DIV 且当前元素就是容器本身（不是其子元素）：继续冒泡
+      // 如果容器内有文字内容（直接子文本节点），就停在容器
+      if (CONTAINER_TAGS.indexOf(target.tagName) >= 0) {
+        // 检查是否有直接文本内容（不只是子元素的文本）
+        var hasDirectText = false;
+        for (var c = target.firstChild; c; c = c.nextSibling) {
+          if (c.nodeType === 3 && c.textContent.trim()) { hasDirectText = true; break; }
+        }
+        // 有自己的文本内容 → 值得编辑的容器，停下来
+        if (hasDirectText) break;
+        // 纯容器（没有自己的文字，只包裹子元素） → 继续向上冒泡
+        // 但如果这个容器有实质性的 class/style（非框架辅助类），也停下来
+        var meaningfulClass = target.className && typeof target.className === 'string'
+          && target.className.split(/\s+/).filter(function(cn) {
+            return cn && cn !== 'is-active' && cn !== 'is-prev' && cn !== 'is-editing'
+              && cn !== 'row' && cn !== 'stack' && cn !== 'grid' && cn !== 'center'
+              && cn !== 'fill' && cn !== 'g2' && cn !== 'g3' && cn !== 'g4'
+              && cn !== 'wrap' && cn !== 'flex' && cn !== 'slide';
+          }).length > 0;
+        if (meaningfulClass) break;
+      }
       target = target.parentElement;
     }
+
     var isMeaningful = target && target !== document.body && target !== document.documentElement && !target.classList.contains('slide');
     return isMeaningful ? target : null;
   }
@@ -405,8 +437,25 @@ const runtimeScript = `
   document.addEventListener('dblclick', function(e) {
     if (isDragging || isResizing) return;
     var el = e.target;
-    if (el === highlightEl) return;
-    if (el.hasAttribute && el.hasAttribute('data-resize-handle')) return;
+
+    // 双击选择框或 resize 手柄 → 对当前选中元素进入编辑
+    if (el === highlightEl || (el.hasAttribute && el.hasAttribute('data-resize-handle'))) {
+      if (currentSelected && currentSelected.tagName !== 'IMG') {
+        var editingEl = currentSelected;
+        e.preventDefault();
+        e.stopPropagation();
+        enterEditing(editingEl);
+        requestAnimationFrame(function() {
+          if (!isEditing || currentSelected !== editingEl) return;
+          var range = document.createRange();
+          range.selectNodeContents(editingEl);
+          var sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+        });
+      }
+      return;
+    }
 
     var target = findEditableTarget(el);
     if (!target) return;
